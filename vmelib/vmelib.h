@@ -83,7 +83,7 @@ public:
 
   // image related function
 
-  int getImage(unsigned int base, unsigned int size, int vas, int vdw, int ms);
+  int getImage(unsigned int base, unsigned int size, int vas = A32, int vdw = D32, int ms = MASTER);
   void releaseImage(int image);
   unsigned int getPciBaseAddr(int image);
 
