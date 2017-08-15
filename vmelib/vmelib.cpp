@@ -1036,6 +1036,8 @@ VMEBridge::VMEBridge(void)
   dmaImageSize = 0;
   dmaImageBase = 0;
   dma_ctl = 0;
+  dmaBufSize = 0;
+  dmaMaxBuf = 0;
 }
 
 //----------------------------------------------------------------------------
