@@ -66,15 +66,17 @@ private:
 
   unsigned int listPtr, dma_ctl;
   unsigned int vmeBaseAddr[8];
-  unsigned int vmeImageBase[18], vmeImageSize[18];
-  unsigned int dmaImageBase, dmaImageSize, dmaBufSize, dmaMaxBuf;
+  uintptr_t vmeImageBase[18];
+  unsigned int vmeImageSize[18];
+  unsigned int dmaImageSize, dmaBufSize, dmaMaxBuf;
+  uintptr_t dmaImageBase;
   std::vector<int> usedLists;
 
   int there(unsigned int addr, unsigned int mode);
   int checkIrqParamter(unsigned int level, unsigned int statusID);
   int checkMbxNr(int mailbox);
   int checkDmaParam(unsigned int count, unsigned int bufNr);
-  unsigned int getAddr(int, int);
+  uintptr_t getAddr(int, int);
   int vmemap(int, unsigned int, unsigned int, unsigned int, int);
 
 public:
@@ -85,7 +87,7 @@ public:
 
   int getImage(unsigned int base, unsigned int size, int vas = A32, int vdw = D32, int ms = MASTER);
   void releaseImage(int image);
-  unsigned int getPciBaseAddr(int image);
+  uintptr_t getPciBaseAddr(int image);
 
   // Options
 
@@ -108,9 +110,9 @@ public:
 
   // DMA
 
-  unsigned int requestDMA(void);
-  unsigned int requestDMA(int);
-  unsigned int getDMABase(void);
+  uintptr_t requestDMA(void);
+  uintptr_t requestDMA(int);
+  uintptr_t getDMABase(void);
   void releaseDMA(void);
   int DMAread(unsigned int source, unsigned int count, int vas, int vdw);
   int DMAread(unsigned int source, unsigned int count, int vas, int vdw, unsigned int bufNr);

@@ -59,7 +59,7 @@ int VMEBridge::resetDriver()
 //----------------------------------------------------------------------------
 //  get memory mapped address of an image
 //----------------------------------------------------------------------------
-unsigned int VMEBridge::getAddr(int handle, int size)
+uintptr_t VMEBridge::getAddr(int handle, int size)
 {
   char *mapped_data;
 
@@ -71,7 +71,7 @@ unsigned int VMEBridge::getAddr(int handle, int size)
     return 0;
   }
 
-  return (unsigned int) mapped_data;
+  return (uintptr_t) mapped_data;
 }
 
 //----------------------------------------------------------------------------
@@ -501,7 +501,7 @@ int VMEBridge::releaseMBX(int mailbox)
 //----------------------------------------------------------------------------
 //  Request ownership of UniverseII onboard DMA and setup multiple buffer
 //----------------------------------------------------------------------------
-unsigned int VMEBridge::requestDMA(int nrOfBufs)
+uintptr_t VMEBridge::requestDMA(int nrOfBufs)
 {
   int result, i = 0;
 
@@ -541,12 +541,12 @@ unsigned int VMEBridge::requestDMA(int nrOfBufs)
   return dmaImageBase;
 }
 
-unsigned int VMEBridge::requestDMA(void)
+uintptr_t VMEBridge::requestDMA(void)
 {
   return requestDMA(1);
 }
 
-unsigned int VMEBridge::getDMABase(void)
+uintptr_t VMEBridge::getDMABase(void)
 {
   return dmaImageBase;
 }
@@ -752,7 +752,7 @@ int VMEBridge::execCmdPktList(int list)
 //----------------------------------------------------------------------------
 //  Get PCI base address to access VME directly
 //----------------------------------------------------------------------------
-unsigned int VMEBridge::getPciBaseAddr(int image)
+uintptr_t VMEBridge::getPciBaseAddr(int image)
 {
   if ((image < 0) || (image > 17))
   {
