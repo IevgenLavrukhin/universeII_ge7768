@@ -374,7 +374,7 @@ int VMEBridge::freeIrq(int image, unsigned int irqLevel, unsigned int statusID)
 //----------------------------------------------------------------------------
 //  wait for IRQ
 //----------------------------------------------------------------------------
-int VMEBridge::waitIrq(unsigned int irqLevel, unsigned int statusID, unsigned long timeout)
+int VMEBridge::waitIrq(unsigned int irqLevel, unsigned int statusID, uint32_t timeout)
 {
   // timeout in milliseconds, does not work with High precision timers.
 

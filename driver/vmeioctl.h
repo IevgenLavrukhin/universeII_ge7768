@@ -68,55 +68,55 @@
 
 typedef struct
 {
-    int ms;
-    unsigned int base;
-    unsigned int size;
+    int32_t ms;
+    uint32_t base;
+    uint32_t size;
 } image_regs_t;
 
 
 typedef struct
 {
-    unsigned int addr;
-    unsigned int count;
-    int vas;
-    int vdw;
-    int dma_ctl;
-    int bufNr;
+    uint32_t addr;
+    uint32_t count;
+    int32_t vas;
+    int32_t vdw;
+    int32_t dma_ctl;
+    int32_t bufNr;
 } dma_param_t;
 
 
 typedef struct
 {
-    unsigned int dctl;
-    unsigned int dtbc;
-    unsigned int dva;
-    int list;
+    uint32_t dctl;
+    uint32_t dtbc;
+    uint32_t dva;
+    int32_t list;
 } list_packet_t;
 
 
 typedef struct
 {
-    int vmeIrq;
-    int vmeStatus;
-    int vmeAddrSt;
-    int vmeValSt;
-    int vmeAddrCl;
-    int vmeValCl;
+    int32_t vmeIrq;
+    int32_t vmeStatus;
+    int32_t vmeAddrSt;
+    int32_t vmeValSt;
+    int32_t vmeAddrCl;
+    int32_t vmeValCl;
 } irq_setup_t;
 
 
 typedef struct
 {
-    int irqLevel;
-    int statusID;
-    unsigned long timeout;
+    int32_t irqLevel;
+    int32_t statusID;
+    uint32_t timeout;
 } irq_wait_t;
 
 
 typedef struct
 {
-    unsigned int addr;
-    unsigned int mode;
+    uint32_t addr;
+    uint32_t mode;
 } there_data_t;
 
 #endif

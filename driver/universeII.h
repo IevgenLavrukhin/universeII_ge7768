@@ -24,12 +24,12 @@
 // structure to handle image related paramters
 
 typedef struct {
-    unsigned int phys_start;    // Start addr of PCI image
-    unsigned int phys_end;      // End addr of PCI image
-    unsigned int size;          // Size of image
+    uint32_t phys_start;    // Start addr of PCI image
+    uint32_t phys_end;      // End addr of PCI image
+    uint32_t size;          // Size of image
     void __iomem *vBase;        // Virtual image base PCI address
-    int okToWrite;              // Indicates that image is ready to be used
-    int opened;                 // Indicated different states during open process
+    int32_t okToWrite;              // Indicates that image is ready to be used
+    int32_t opened;                 // Indicated different states during open process
     void __iomem *slaveBuf;     // Slave buffer address in kernel space
     dma_addr_t buffer;          // Slave buffer address in PCI address space
 } image_desc_t;
@@ -38,20 +38,20 @@ typedef struct {
 // structure to driver statistics
 
 typedef struct {
-    unsigned long reads;
-    unsigned long writes;
-    unsigned long ioctls;
-    unsigned long irqs;
-    unsigned long berrs;
-    unsigned long dmaErrors;
-    unsigned long timeouts;
+    uint32_t reads;
+    uint32_t writes;
+    uint32_t ioctls;
+    uint32_t irqs;
+    uint32_t berrs;
+    uint32_t dmaErrors;
+    uint32_t timeouts;
 } driver_stats_t;
 
 
 // structure for VMEBus irq handling
 
 typedef struct {
-    int ok;
+    int32_t ok;
     void __iomem *vmeAddrSt;
     u32 vmeValSt;
     void __iomem *vmeAddrCl;
@@ -78,10 +78,10 @@ typedef struct {
 // structure for handling of VME bus errors
 
 typedef struct {
-    unsigned char valid;
-    unsigned char AM;
+    uint8_t valid;
+    uint8_t AM;
     u32 address;
-    unsigned char merr;
+    uint8_t merr;
 } vme_Berr_t;
 
 
@@ -90,7 +90,7 @@ typedef struct {
 struct kcp                    // Kernel command packet
 {
     DMA_cmd_packet_t dcp;     // DMA command packet
-    unsigned int pciStart;    // Address for next data area
+    uint32_t pciStart;    // Address for next data area
     struct kcp *next;         // Pointer to next packet in kernel space 
 };                            // (kernel and PCI addresses are NOT the same!)
 
@@ -99,7 +99,7 @@ struct kcp                    // Kernel command packet
 
 struct cpl
 {
-    int free;                   // Indicates if this list is free
+    int32_t free;                   // Indicates if this list is free
     struct kcp *commandPacket;  // Pointer to first element of list
     dma_addr_t start;           // Start address for DMA in PCI address space
 };
