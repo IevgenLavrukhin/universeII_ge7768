@@ -98,7 +98,7 @@ public:
   int setupIrq(int image, unsigned int irqLevel, unsigned int statusID, unsigned int addrSt, unsigned int valSt, unsigned int addrCl, unsigned int valCl);
   int freeIrq(int image, unsigned int irqLevel, unsigned int statusID);
   int waitIrq(unsigned int irqLevel, unsigned int statusID);
-  int waitIrq(unsigned int irqLevel, unsigned int statusID, uint32_t timeout);
+  int waitIrq(unsigned int irqLevel, unsigned int statusID, long timeout);
   int generateVmeIrq(unsigned int irqLevel, unsigned int statusID);
 
   // Mailbox use
