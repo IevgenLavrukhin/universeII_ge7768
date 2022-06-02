@@ -39,7 +39,7 @@ MODULE_DESCRIPTION("VME driver for the Tundra Universe II PCI to VME bridge");
 MODULE_AUTHOR("Andreas Ehmanns <universeII@gmx.de>");
 MODULE_LICENSE("GPL");
 
-static const char Version[] = "0.95 (August 2012)";
+static const char Version[] = "0.96 (June 2022)";
 
 #define VMIC
 #ifdef VMIC
@@ -392,7 +392,7 @@ static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, 
   p = buf;
   p += sprintf(p, "%s driver version %s\n", driver_name, Version);
 
-  p += sprintf(p, "  baseaddr = %08X\n\n", (int) baseaddr);
+  p += sprintf(p, "  baseaddr = %p\n\n", baseaddr);
 
   if (vrai_bs != 0)
     p += sprintf(p, "Access to universeII registers from VME at: "
@@ -1715,7 +1715,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
     if (i == MAX_IMAGE)          // no image for this address found
       return -1;
 
-    virtAddr = image[i].vBase + there.addr - to - bs;
+    virtAddr = image[i].vBase + (there.addr - to - bs);
 
     spin_lock(&vme_lock);
 
