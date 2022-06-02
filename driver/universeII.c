@@ -45,59 +45,59 @@ static const char Version[] = "0.95 (August 2012)";
 #ifdef VMIC
 #include "vmic.h"
 static void __iomem *VmicBaseAddr;
-static uint32_t VmicBase;
+static unsigned int VmicBase;
 #endif
 
 //----------------------------------------------------------------------------
 // Module parameters
 //----------------------------------------------------------------------------
 
-static int32_t sys_ctrl = 1;
-module_param(sys_ctrl, int32_t, 0);
+static int sys_ctrl = 1;
+module_param(sys_ctrl, int, 0);
 MODULE_PARM_DESC(sys_ctrl, " Set to 1 to enable VME system controller (default)");
 
-static int32_t br_level = 3;
-module_param(br_level, int32_t, 0);
+static int br_level = 3;
+module_param(br_level, int, 0);
 MODULE_PARM_DESC(br_level, " VMEBus request level (default is BR3)");
 
-static int32_t req_mode = 0;
-module_param(req_mode, int32_t, 0);
+static int req_mode = 0;
+module_param(req_mode, int, 0);
 MODULE_PARM_DESC(req_mode, " Request mode. Default: demand");
 
-static int32_t rel_mode = 0;
-module_param(rel_mode, int32_t, 0);
+static int rel_mode = 0;
+module_param(rel_mode, int, 0);
 MODULE_PARM_DESC(rel_mode, " Release mode. Default: Release when done (RWD)");
 
-static int32_t vrai_bs = 0;
-module_param(vrai_bs, int32_t, 0);
+static int vrai_bs = 0;
+module_param(vrai_bs, int, 0);
 MODULE_PARM_DESC(vrai_bs, "  Enable VMEBus access to universeII registers. Default: Disabled");
 
-static int32_t vbto = 3;
-module_param(vbto, int32_t, 0);
+static int vbto = 3;
+module_param(vbto, int, 0);
 MODULE_PARM_DESC(vbto, "     VMEBus Time-out");
 
-static int32_t varb = 0;
-module_param(varb, int32_t, 0);
+static int varb = 0;
+module_param(varb, int, 0);
 MODULE_PARM_DESC(varb, "     VMEBus Arbitration Mode");
 
-static int32_t varbto = 1;
-module_param(varbto, int32_t, 0);
+static int varbto = 1;
+module_param(varbto, int, 0);
 MODULE_PARM_DESC(varbto, "   VMEBus Arbitration Time-out");
 
-static int32_t img_ovl = 1;
-module_param(img_ovl, int32_t, 0);
+static int img_ovl = 1;
+module_param(img_ovl, int, 0);
 MODULE_PARM_DESC(img_ovl, "  Set to 0 to forbid overlapping images. Default: Allowed");
 
 //----------------------------------------------------------------------------
 // Prototypes
 //----------------------------------------------------------------------------
 
-static int32_t universeII_open(struct inode*, struct file*);
-static int32_t universeII_release(struct inode*, struct file*);
+static int universeII_open(struct inode*, struct file*);
+static int universeII_release(struct inode*, struct file*);
 static ssize_t universeII_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t universeII_write(struct file *, const char __user *, size_t, loff_t *);
-static int32_t universeII_ioctl(struct file*, uint32_t, uint32_t);
-static int32_t universeII_mmap(struct file*, struct vm_area_struct*);
+static long universeII_ioctl(struct file*, unsigned int, unsigned long);
+static int universeII_mmap(struct file*, struct vm_area_struct*);
 
 /*
  * _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
@@ -123,30 +123,30 @@ static struct class *universeII_sysfs_class;
 static char pci_driver_name[] = "universeII";
 static const char driver_name[] = "universeII";
 
-static const int32_t aCTL[18] = { LSI0_CTL, LSI1_CTL, LSI2_CTL, LSI3_CTL,
+static const int aCTL[18] = { LSI0_CTL, LSI1_CTL, LSI2_CTL, LSI3_CTL,
 LSI4_CTL, LSI5_CTL, LSI6_CTL, LSI7_CTL, 0, 0,
 VSI0_CTL, VSI1_CTL, VSI2_CTL, VSI3_CTL,
 VSI4_CTL, VSI5_CTL, VSI6_CTL, VSI7_CTL };
 
-static const int32_t aBS[18] = { LSI0_BS, LSI1_BS, LSI2_BS, LSI3_BS,
+static const int aBS[18] = { LSI0_BS, LSI1_BS, LSI2_BS, LSI3_BS,
 LSI4_BS, LSI5_BS, LSI6_BS, LSI7_BS, 0, 0,
 VSI0_BS, VSI1_BS, VSI2_BS, VSI3_BS,
 VSI4_BS, VSI5_BS, VSI6_BS, VSI7_BS };
 
-static const int32_t aBD[18] = { LSI0_BD, LSI1_BD, LSI2_BD, LSI3_BD,
+static const int aBD[18] = { LSI0_BD, LSI1_BD, LSI2_BD, LSI3_BD,
 LSI4_BD, LSI5_BD, LSI6_BD, LSI7_BD, 0, 0,
 VSI0_BD, VSI1_BD, VSI2_BD, VSI3_BD,
 VSI4_BD, VSI5_BD, VSI6_BD, VSI7_BD };
 
-static const int32_t aTO[18] = { LSI0_TO, LSI1_TO, LSI2_TO, LSI3_TO,
+static const int aTO[18] = { LSI0_TO, LSI1_TO, LSI2_TO, LSI3_TO,
 LSI4_TO, LSI5_TO, LSI6_TO, LSI7_TO, 0, 0,
 VSI0_TO, VSI1_TO, VSI2_TO, VSI3_TO,
 VSI4_TO, VSI5_TO, VSI6_TO, VSI7_TO };
 
-static const int32_t aVIrq[7] = { V1_STATID, V2_STATID, V3_STATID, V4_STATID,
+static const int aVIrq[7] = { V1_STATID, V2_STATID, V3_STATID, V4_STATID,
 V5_STATID, V6_STATID, V7_STATID };
 
-static const int32_t mbx[4] = { MAILBOX0, MAILBOX1, MAILBOX2, MAILBOX3 };
+static const int mbx[4] = { MAILBOX0, MAILBOX1, MAILBOX2, MAILBOX3 };
 
 /*
  * _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
@@ -175,9 +175,9 @@ static void __iomem *baseaddr = 0;// Base address of Tundra chip
 static void __iomem *dmaBuf = 0;// DMA buf address in kernel space
 static dma_addr_t dmaHandle = 0;
 
-static uint32_t dmaBufSize = 0;      // Size of one DMA buffer
-static uint32_t dma_dctl;            // DCTL register for DMA
-static int32_t dma_in_use = 0;
+static unsigned int dmaBufSize = 0;      // Size of one DMA buffer
+static unsigned int dma_dctl;            // DCTL register for DMA
+static int dma_in_use = 0;
 
 // All image related information like start address, end address, ...
 
@@ -221,8 +221,8 @@ static DEFINE_SPINLOCK( mbx_lock);
 
 // Autoprobing 
 
-static int32_t __init universeII_init(void);
-static int32_t universeII_probe(struct pci_dev*, const struct pci_device_id*);
+static int __init universeII_init(void);
+static int universeII_probe(struct pci_dev*, const struct pci_device_id*);
 static void universeII_remove(struct pci_dev*);
 static void __exit universeII_exit(void);
 
@@ -252,7 +252,7 @@ static struct pci_driver universeII_driver = {
 //  DMA_timeout
 //
 //----------------------------------------------------------------------------
-static void DMA_timeout(uint32_t ptr)
+static void DMA_timeout(unsigned long ptr)
 {
   wake_up_interruptible(&dmaWait);
   statistics.timeouts++;
@@ -263,7 +263,7 @@ static void DMA_timeout(uint32_t ptr)
 //  MBX_timeout
 //
 //----------------------------------------------------------------------------
-static void MBX_timeout(uint32_t ptr)
+static void MBX_timeout(unsigned long ptr)
 {
   MBX_timer[ptr].data = 0xFFFF;
   wake_up_interruptible(&mbxWait[ptr]);
@@ -275,7 +275,7 @@ static void MBX_timeout(uint32_t ptr)
 //  VIRQ_timeout
 //
 //----------------------------------------------------------------------------
-static void VIRQ_timeout(uint32_t ptr)
+static void VIRQ_timeout(unsigned long ptr)
 {
   irq_device[ptr >> 8][ptr & 0xFF].virqTimer.data = 0xFFFF;
   wake_up_interruptible(&irq_device[ptr >> 8][ptr & 0xFF].irqWait);
@@ -287,9 +287,9 @@ static void VIRQ_timeout(uint32_t ptr)
 //  irq_handler()
 //
 //----------------------------------------------------------------------------
-static irqreturn_t irq_handler(int32_t irq, void *dev_id)
+static irqreturn_t irq_handler(int irq, void *dev_id)
 {
-  int32_t i;
+  int i;
   u32 status, enable, statVme;
 
   enable = readl(baseaddr + LINT_EN);
@@ -380,19 +380,19 @@ static irqreturn_t irq_handler(int32_t irq, void *dev_id)
 //  universeII_procinfo()
 //
 //----------------------------------------------------------------------------
-static int32_t universeII_procinfo(char *buf, char **start, off_t fpos, int32_t lenght, int32_t *eof, void *data)
+static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, int *eof, void *data)
 {
   const char *const Axx[8] = { "A16", "A24", "A32", "Reserved", "Reserved", "CR/SCR", "User1", "User2" };
   const char *const Dxx[4] = { "D8", "D16", "D32", "D64" };
 
   char *p;
-  int32_t i, index;
+  int i, index;
   u32 ctl, bs, bd, to;
 
   p = buf;
   p += sprintf(p, "%s driver version %s\n", driver_name, Version);
 
-  p += sprintf(p, "  baseaddr = %08X\n\n", (int32_t) baseaddr);
+  p += sprintf(p, "  baseaddr = %08X\n\n", (int) baseaddr);
 
   if (vrai_bs != 0)
     p += sprintf(p, "Access to universeII registers from VME at: "
@@ -499,7 +499,7 @@ static void unregister_proc(void)
 //  testAndClearBERR()
 //
 //----------------------------------------------------------------------------
-static int32_t testAndClearBERR(void)
+static int testAndClearBERR(void)
 {
   u32 tmp = readl(baseaddr + PCI_CSR);            // Check for a bus error
 
@@ -518,7 +518,7 @@ static int32_t testAndClearBERR(void)
 //  testAndClearDMAErrors()
 //
 //----------------------------------------------------------------------------
-static int32_t testAndClearDMAErrors(void)
+static int testAndClearDMAErrors(void)
 {
   u32 tmp = readl(baseaddr + DGCS);
 
@@ -602,10 +602,10 @@ static u32 getPciBaseAddr(u32 size)
 static ssize_t universeII_read(struct file *file, char __user *buf,
     size_t count, loff_t *ppos)
 {
-  int32_t i = 0, okcount = 0, offset = 0, berr = 0;
-  uint32_t dw, pci = 0;
+  int i = 0, okcount = 0, offset = 0, berr = 0;
+  unsigned int dw, pci = 0;
   char *temp = buf;
-  int32_t res=0;
+  int res=0;
 
   u8 vc;          // 8 bit transfers
   u16 vs;// 16 bit transfers
@@ -613,7 +613,7 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
 
   void __iomem *image_ptr;
   dma_param_t dmaParam;
-  uint32_t minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
 
   statistics.reads++;
   switch (minor)
@@ -781,8 +781,8 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
 static ssize_t universeII_write(struct file *file, const char __user *buf,
     size_t count, loff_t *ppos)
 {
-  int32_t i = 0, okcount = 0, offset = 0, berr = 0, res = 0;
-  uint32_t dw, pci = 0;
+  int i = 0, okcount = 0, offset = 0, berr = 0, res = 0;
+  unsigned int dw, pci = 0;
   char *temp = (char *) buf;
 
   u8 vc;          // 8 bit transfers
@@ -791,7 +791,7 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
 
   void __iomem *image_ptr;
   dma_param_t dmaParam;
-  uint32_t minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
 
   statistics.writes++;
   switch (minor)
@@ -954,9 +954,9 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
 //  universeII_mmap()
 //
 //----------------------------------------------------------------------------
-static int32_t universeII_mmap(struct file *file, struct vm_area_struct *vma)
+static int universeII_mmap(struct file *file, struct vm_area_struct *vma)
 {
-  uint32_t minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
   image_desc_t *p;
 
   file->private_data = &image[minor];
@@ -1019,9 +1019,9 @@ static int32_t universeII_mmap(struct file *file, struct vm_area_struct *vma)
 //  universeII_open()
 //
 //----------------------------------------------------------------------------
-static int32_t universeII_open(struct inode *inode, struct file *file)
+static int universeII_open(struct inode *inode, struct file *file)
 {
-  uint32_t minor = MINOR(inode->i_rdev);
+  unsigned int minor = MINOR(inode->i_rdev);
 
   if (minor > MAX_MINOR)
     return (-ENODEV);
@@ -1048,10 +1048,10 @@ static int32_t universeII_open(struct inode *inode, struct file *file)
 //  universeII_release()
 //
 //----------------------------------------------------------------------------
-static int32_t universeII_release(struct inode *inode, struct file *file)
+static int universeII_release(struct inode *inode, struct file *file)
 {
-  uint32_t minor = MINOR(inode->i_rdev);
-  int32_t i, j;
+  unsigned int minor = MINOR(inode->i_rdev);
+  int i, j;
 
   if (image[minor].vBase != NULL)
   {
@@ -1086,11 +1086,11 @@ static int32_t universeII_release(struct inode *inode, struct file *file)
 //  universeII_ioctl()
 //
 //----------------------------------------------------------------------------
-static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
-    uint32_t arg)
+static long universeII_ioctl(struct file *file, unsigned int cmd,
+    unsigned long arg)
 {
-  uint32_t minor = MINOR(file->f_dentry->d_inode->i_rdev);
-  uint32_t i = 0, res = 0;
+  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int i = 0, res = 0;
   u32 ctl = 0, to = 0, bs = 0, bd = 0, imageStart, imageEnd;
 
   statistics.ioctls++;
@@ -1111,7 +1111,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_SET_IMAGE:
   {
-    uint32_t pciBase = 0;
+    unsigned int pciBase = 0;
     image_regs_t iRegs;
 
     res = copy_from_user(&iRegs, (char*) arg, sizeof(iRegs));
@@ -1235,7 +1235,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_GET_IMAGE:
   {
-    uint32_t offset = 0;
+    unsigned int offset = 0;
 
     if ((arg < 0) || (arg > 1))
       return -1;
@@ -1266,7 +1266,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_GEN_VME_IRQ:
   {
-    int32_t level;
+    int level;
 
     DEFINE_WAIT(wait);
 
@@ -1294,7 +1294,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
     u32 base, toffset;
     void __iomem
     *virtAddr;
-    int32_t virq, vstatid;
+    int virq, vstatid;
     irq_setup_t isetup;
 
     res = copy_from_user(&isetup, (char*) arg, sizeof(isetup));
@@ -1360,7 +1360,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_FREE_IRQ:
   {
-    int32_t virq, vstatid;
+    int virq, vstatid;
     irq_setup_t isetup;
 
     res = copy_from_user(&isetup, (char*) arg, sizeof(isetup));
@@ -1391,8 +1391,8 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_WAIT_IRQ:
   {
-    int32_t vmeIrq, vmeStatus;
-    uint32_t timeout = 0;
+    int vmeIrq, vmeStatus;
+    unsigned long timeout = 0;
     irq_wait_t irqData;
     struct timer_list *vTimer = NULL;
 
@@ -1450,7 +1450,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
   case IOCTL_SET_MBX:
   {
     u32 mbx_en;
-    uint32_t mbxNr;
+    unsigned int mbxNr;
 
     mbxNr = 0x10000 << (arg & 0x3);
 
@@ -1473,7 +1473,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
   case IOCTL_WAIT_MBX:
   {
     u32 lintEn;
-    uint32_t mbxNr;
+    unsigned int mbxNr;
 
     DEFINE_WAIT(wait);
 
@@ -1517,7 +1517,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
   case IOCTL_RELEASE_MBX:
   {
     u32 lintEn;
-    uint32_t mbxNr;
+    unsigned int mbxNr;
 
     mbxNr = 0x10000 << (arg & 0x3);
 
@@ -1553,7 +1553,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_ADD_DCP:
   {
-    uint32_t dla, offset;
+    unsigned int dla, offset;
     list_packet_t lpacket;
     struct kcp *newP, *ptr;
 
@@ -1630,7 +1630,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_EXEC_DCP:
   {
-    int32_t n = 0;
+    int n = 0;
     u32 val;
     struct kcp *scan;
 
@@ -1692,7 +1692,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
   {
     void __iomem
     *virtAddr;
-    int32_t berr;
+    int berr;
     there_data_t there;
 
     res = __copy_from_user(&there, (char*) arg, sizeof(there));
@@ -1750,7 +1750,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_TEST_BERR:
   {
-    int32_t berr;
+    int berr;
 
     spin_lock(&vme_lock);
     berr = testAndClearBERR();
@@ -1762,7 +1762,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_REQUEST_DMA:
   {
-    int32_t code = 0;
+    int code = 0;
 
     spin_lock(&dma_lock);   // set spinlock to protect "dma_in_use"
     if ((dma_in_use) || (!dmaBuf))
@@ -1797,7 +1797,7 @@ static int32_t universeII_ioctl(struct file *file, uint32_t cmd,
 
   case IOCTL_RESET_ALL:
   {
-    int32_t j, error = 0;
+    int j, error = 0;
     u32 csr;
     struct kcp *del, *search;
 
@@ -1901,7 +1901,7 @@ static void __exit universeII_exit(void)
 
 static void universeII_remove(struct pci_dev *pdev)
 {
-  int32_t i;
+  int i;
   void __iomem
   *virtAddr;
   struct page *page;
@@ -1967,20 +1967,20 @@ static void universeII_remove(struct pci_dev *pdev)
 //
 //----------------------------------------------------------------------------
 
-static int32_t __init universeII_init(void)
+static int __init universeII_init(void)
 {
   return pci_register_driver(&universeII_driver);
 }
 
-static int32_t universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
   u32 ba, temp, status, misc_ctl, mast_ctl, vrai_ctl, pci_csr;
-  int32_t i, j, result, err, num;
+  int i, j, result, err, num;
   void __iomem
   *virtAddr;
   struct page *page;
   char name[12];
-  int32_t retval;
+  int retval;
 
 #ifdef VMIC
   struct pci_dev *vmicPci = NULL;
