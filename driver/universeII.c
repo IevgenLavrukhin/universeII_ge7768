@@ -226,7 +226,11 @@ static int universeII_probe(struct pci_dev*, const struct pci_device_id*);
 static void universeII_remove(struct pci_dev*);
 static void __exit universeII_exit(void);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
+static const struct pci_device_id universeII_ids[] = {
+#else
 static DEFINE_PCI_DEVICE_TABLE (universeII_ids) = {
+#endif
     { PCI_DEVICE(PCI_VENDOR_ID_TUNDRA, PCI_DEVICE_ID_TUNDRA_CA91C042) },
     { },
 };
@@ -238,6 +242,12 @@ static struct pci_driver universeII_driver = {
     .probe = universeII_probe,
     .remove = universeII_remove,
 };
+
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0)
+#define file_inode(file) ((file)->f_dentry->d_inode)
+#endif
+
 
 /*
  * _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
@@ -385,11 +395,11 @@ static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, 
   const char *const Axx[8] = { "A16", "A24", "A32", "Reserved", "Reserved", "CR/SCR", "User1", "User2" };
   const char *const Dxx[4] = { "D8", "D16", "D32", "D64" };
 
-  char *p;
   int i, index;
   u32 ctl, bs, bd, to;
 
-  p = buf;
+  char *p = buf;
+
   p += sprintf(p, "%s driver version %s\n", driver_name, Version);
 
   p += sprintf(p, "  baseaddr = %p\n\n", baseaddr);
@@ -613,7 +623,7 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
 
   void __iomem *image_ptr;
   dma_param_t dmaParam;
-  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file_inode(file)->i_rdev);
 
   statistics.reads++;
   switch (minor)
@@ -791,7 +801,7 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
 
   void __iomem *image_ptr;
   dma_param_t dmaParam;
-  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file_inode(file)->i_rdev);
 
   statistics.writes++;
   switch (minor)
@@ -956,7 +966,7 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
 //----------------------------------------------------------------------------
 static int universeII_mmap(struct file *file, struct vm_area_struct *vma)
 {
-  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file_inode(file)->i_rdev);
   image_desc_t *p;
 
   file->private_data = &image[minor];
@@ -1089,7 +1099,7 @@ static int universeII_release(struct inode *inode, struct file *file)
 static long universeII_ioctl(struct file *file, unsigned int cmd,
     unsigned long arg)
 {
-  unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+  unsigned int minor = MINOR(file_inode(file)->i_rdev);
   unsigned int i = 0, res = 0;
   u32 ctl = 0, to = 0, bs = 0, bd = 0, imageStart, imageEnd;
 
