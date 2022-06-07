@@ -180,39 +180,31 @@ static unsigned int dma_dctl;            // DCTL register for DMA
 static int dma_in_use = 0;
 
 // All image related information like start address, end address, ...
-
 static image_desc_t image[18];
 
 // Pointers to 256 available linked lists
-
 static struct cpl cpLists[256];
 
+// Interrupt information
 static irq_device_t irq_device[7][256];
 
 // Structure holds information about driver statistics (reads, writes, ...)
-
 static driver_stats_t statistics;
 
 // VMEBus interrupt wait queue
-
 DECLARE_WAIT_QUEUE_HEAD( vmeWait);
 
 // DMA timer and DMA wait queue
-
 static struct timer_list DMA_timer;      // This is a timer for returning status
-
 DECLARE_WAIT_QUEUE_HEAD( dmaWait);
 
-// Mailbox wait queues
+// Mailbox information
+static mbx_device_t mbx_device[4];
 
-static struct timer_list MBX_timer[4];   // This is a timer for returning status
-static wait_queue_head_t mbxWait[4];
-
-static vme_Berr_t vmeBerrList[32];       // A circular buffer for storing
-// the last 32 VME BERR.
+// A circular buffer for storing the last 32 VME BERR.
+static vme_Berr_t vmeBerrList[32];       
 
 // Spinlocks
-
 static DEFINE_SPINLOCK( get_image_lock);
 static DEFINE_SPINLOCK( set_image_lock);
 static DEFINE_SPINLOCK( vme_lock);
@@ -220,7 +212,6 @@ static DEFINE_SPINLOCK( dma_lock);
 static DEFINE_SPINLOCK( mbx_lock);
 
 // Autoprobing 
-
 static int __init universeII_init(void);
 static int universeII_probe(struct pci_dev*, const struct pci_device_id*);
 static void universeII_remove(struct pci_dev*);
@@ -275,8 +266,8 @@ static void DMA_timeout(unsigned long ptr)
 //----------------------------------------------------------------------------
 static void MBX_timeout(unsigned long ptr)
 {
-  MBX_timer[ptr].data = 0xFFFF;
-  wake_up_interruptible(&mbxWait[ptr]);
+  mbx_device[ptr].mbxTimer.data = 0xFFFF;
+  wake_up_interruptible(&mbx_device[ptr].mbxWait);
   statistics.timeouts++;
 }
 
@@ -349,7 +340,7 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
   if (status & 0xF0000)
     for (i = 0; i < 4; i++)
       if (status & (0x10000 << i))
-        wake_up_interruptible(&mbxWait[i]);
+        wake_up_interruptible(&mbx_device[i].mbxWait);
 
   // IACK interrupt
   if (status & 0x1000)
@@ -1497,26 +1488,26 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
     readl(baseaddr + LINT_EN);
 
-    MBX_timer[mbxNr].expires = jiffies + (arg >> 16) * HZ;
-    MBX_timer[mbxNr].function = MBX_timeout;
-    MBX_timer[mbxNr].data = mbxNr;
-    add_timer(&MBX_timer[mbxNr]);
+    mbx_device[mbxNr].mbxTimer.expires = jiffies + (arg >> 16) * HZ;
+    mbx_device[mbxNr].mbxTimer.function = MBX_timeout;
+    mbx_device[mbxNr].mbxTimer.data = mbxNr;
+    add_timer(&mbx_device[mbxNr].mbxTimer);
 
-    prepare_to_wait(&mbxWait[mbxNr], &wait, TASK_INTERRUPTIBLE);
+    prepare_to_wait(&mbx_device[mbxNr].mbxWait, &wait, TASK_INTERRUPTIBLE);
     if (readl(baseaddr + LINT_STAT) & ~(0x10000 << mbxNr))
     {
-      finish_wait(&mbxWait[mbxNr], &wait);
+      finish_wait(&mbx_device[mbxNr].mbxWait, &wait);
       printk("%s: previous mailbox interrupt detected!\n", driver_name);
     }
     else
     {
       schedule();                       // Wait for mbx interrupt
-      finish_wait(&mbxWait[mbxNr], &wait);
+      finish_wait(&mbx_device[mbxNr].mbxWait, &wait);
     }
 
-    del_timer(&MBX_timer[mbxNr]);
+    del_timer(&mbx_device[mbxNr].mbxTimer);
 
-    if (MBX_timer[mbxNr].data == 0xFFFF)
+    if (mbx_device[mbxNr].mbxTimer.data == 0xFFFF)
       return -1;
 
     return readl(baseaddr + mbx[mbxNr]);
@@ -2338,7 +2329,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   init_timer(&DMA_timer);
 
   for (i = 0; i < 4; i++)
-    init_timer(&MBX_timer[i]);
+    init_timer(&mbx_device[i].mbxTimer);
 
   // Initialize list for DMA command packet structures
 
@@ -2354,7 +2345,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   init_waitqueue_head(&vmeWait);
 
   for (i = 0; i < 4; i++)
-    init_waitqueue_head(&mbxWait[i]);
+    init_waitqueue_head(&mbx_device[i].mbxWait);
 
   // Reset all irq devices
 

@@ -61,6 +61,13 @@ typedef struct {
 } irq_device_t;
 
 
+// structure for Mailbox wait handling
+typedef struct {
+    wait_queue_head_t mbxWait;
+    struct timer_list mbxTimer;
+} mbx_device_t;
+
+
 // data structure of the DMA command packets
 
 typedef struct {
