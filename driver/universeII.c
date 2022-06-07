@@ -2021,7 +2021,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
   pci_write_config_dword(universeII_dev, PCI_BS, CONFIG_REG_SPACE);
   pci_read_config_dword(universeII_dev, PCI_BS, &ba);
-  baseaddr = (void __iomem *) ioremap_nocache(ba, 4096);
+  baseaddr = (void __iomem *) ioremap(ba, 4096);
   if (!baseaddr)
   {
     printk("%s: Ioremap failed to map UniverseII to kernel "
@@ -2136,7 +2136,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
     printk("%s: VMIC subsystem ID: %x\n", driver_name, vmicPci->subsystem_device);
 
     pci_read_config_dword(vmicPci, VMIC_FPGA_BASE_ADDR_REG, &VmicBase);
-    VmicBaseAddr = ioremap_nocache(VmicBase, PAGE_SIZE);
+    VmicBaseAddr = ioremap(VmicBase, PAGE_SIZE);
 
     if (VmicBaseAddr == NULL)
       printk("%s: Mapping of VMIC registers failed!\n", driver_name);
