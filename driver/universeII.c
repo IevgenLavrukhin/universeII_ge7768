@@ -28,6 +28,7 @@
 #include <linux/spinlock.h>
 
 #include <linux/poll.h>
+#include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -381,7 +382,11 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 //  universeII_procinfo()
 //
 //----------------------------------------------------------------------------
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0)
 static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, int *eof, void *data)
+#else
+static int universeII_procinfo(struct seq_file *p, void *data)
+#endif
 {
   const char *const Axx[8] = { "A16", "A24", "A32", "Reserved", "Reserved", "CR/SCR", "User1", "User2" };
   const char *const Dxx[4] = { "D8", "D16", "D32", "D64" };
@@ -389,29 +394,32 @@ static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, 
   int i, index;
   u32 ctl, bs, bd, to;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0)
   char *p = buf;
+#define seq_printf p += sprintf
+#endif
 
-  p += sprintf(p, "%s driver version %s\n", driver_name, Version);
+  seq_printf(p, "%s driver version %s\n", driver_name, Version);
 
-  p += sprintf(p, "  baseaddr = %p\n\n", baseaddr);
+  seq_printf(p, "  baseaddr = %p\n\n", baseaddr);
 
   if (vrai_bs != 0)
-    p += sprintf(p, "Access to universeII registers from VME at: "
+    seq_printf(p, "Access to universeII registers from VME at: "
         "0x%08x\n\n", vrai_bs);
 
-  p += sprintf(p, "  Status variables:          DMA: ");
+  seq_printf(p, "  Status variables:          DMA: ");
   if (dma_in_use)
-    p += sprintf(p, "in use\n\n");
+    seq_printf(p, "in use\n\n");
   else
-    p += sprintf(p, "free\n\n");
+    seq_printf(p, "free\n\n");
 
-  p += sprintf(p, "    reads      = %li\n    writes     = %li\n"
+  seq_printf(p, "    reads      = %li\n    writes     = %li\n"
       "    ioctls     = %li\n    irqs       = %li\n"
       "    DMA errors = %li\n    timeouts   = %li \n\n",
       statistics.reads, statistics.writes, statistics.ioctls,
       statistics.irqs, statistics.dmaErrors, statistics.timeouts);
 
-  p += sprintf(p, "Allocated master images:\n");
+  seq_printf(p, "Allocated master images:\n");
 
   for (i = 0; i < 8; i++)
   {
@@ -422,19 +430,19 @@ static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, 
       bd = readl(baseaddr + aBD[i]);
       to = readl(baseaddr + aTO[i]);
 
-      p += sprintf(p, "  Image %i:\n", i);
-      p += sprintf(p, "    Registers                VMEBus range\n");
-      p += sprintf(p, "    LSI%i_CTL = %08x        %s/%s\n", i, ctl,
+      seq_printf(p, "  Image %i:\n", i);
+      seq_printf(p, "    Registers                VMEBus range\n");
+      seq_printf(p, "    LSI%i_CTL = %08x        %s/%s\n", i, ctl,
           Axx[(ctl >> 16) & 0x7], Dxx[(ctl >> 22) & 0x3]);
-      p += sprintf(p, "    LSI%i_BS  = %08x\n", i, bs);
-      p += sprintf(p, "    LSI%i_BD  = %08x       %08x\n", i, bd,
+      seq_printf(p, "    LSI%i_BS  = %08x\n", i, bs);
+      seq_printf(p, "    LSI%i_BD  = %08x       %08x\n", i, bd,
           bs + to);
-      p += sprintf(p, "    LSI%i_TO  = %08x       %08x\n\n", i, to,
+      seq_printf(p, "    LSI%i_TO  = %08x       %08x\n\n", i, to,
           bd + to);
     }
   }
 
-  p += sprintf(p, "Allocated slave images:\n");
+  seq_printf(p, "Allocated slave images:\n");
 
   for (i = 10; i < 18; i++)
   {
@@ -445,34 +453,38 @@ static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, 
       bd = readl(baseaddr + aBD[i]);
       to = readl(baseaddr + aTO[i]);
 
-      p += sprintf(p, "  Image %i:\n", i);
-      p += sprintf(p, "    Registers                VMEBus range\n");
-      p += sprintf(p, "    VSI%i_CTL = %08x          %s\n", i, ctl,
+      seq_printf(p, "  Image %i:\n", i);
+      seq_printf(p, "    Registers                VMEBus range\n");
+      seq_printf(p, "    VSI%i_CTL = %08x          %s\n", i, ctl,
           Axx[(ctl >> 16) & 0x7]);
-      p += sprintf(p, "    VSI%i_BS  = %08x\n", i, bs);
-      p += sprintf(p, "    VSI%i_BD  = %08x       %08x\n", i, bd, bs);
-      p += sprintf(p, "    VSI%i_TO  = %08x       %08x\n\n", i, to, bd);
+      seq_printf(p, "    VSI%i_BS  = %08x\n", i, bs);
+      seq_printf(p, "    VSI%i_BD  = %08x       %08x\n", i, bd, bs);
+      seq_printf(p, "    VSI%i_TO  = %08x       %08x\n\n", i, to, bd);
     }
   }
 
-  p += sprintf(p, "\nNumber of occured VMEBus errors: %li\n", statistics.berrs);
+  seq_printf(p, "\nNumber of occured VMEBus errors: %li\n", statistics.berrs);
 
   if (statistics.berrs > 0)
   {
-    p += sprintf(p, "Showing last 32 BERRs (maximum)\n"
+    seq_printf(p, "Showing last 32 BERRs (maximum)\n"
         " BERR address   AM code     MERR\n");
     for (i = 0; i < 32; i++)
     {
       index = (statistics.berrs - 31 + i) & 0x1F;
       if (vmeBerrList[index].valid)
-        p += sprintf(p, "   %08x       %02x         %01x\n",
+        seq_printf(p, "   %08x       %02x         %01x\n",
             vmeBerrList[index].address, vmeBerrList[index].AM,
             vmeBerrList[index].merr);
     }
   }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0)
   *eof = 1;
   return p - buf;
+#else
+  return 0;
+#endif
 }
 
 //----------------------------------------------------------------------------
@@ -482,7 +494,11 @@ static int universeII_procinfo(char *buf, char **start, off_t fpos, int lenght, 
 //----------------------------------------------------------------------------
 static void register_proc(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+  proc_create_single(driver_name, 0, NULL, universeII_procinfo);
+#else
   create_proc_read_entry(driver_name, 0, NULL, universeII_procinfo, NULL);
+#endif
 }
 
 //----------------------------------------------------------------------------
