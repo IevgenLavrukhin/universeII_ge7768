@@ -58,6 +58,7 @@ typedef struct {
     u32 vmeValCl;
     wait_queue_head_t irqWait;
     struct timer_list virqTimer;
+    int timeout;
 } irq_device_t;
 
 
@@ -65,6 +66,7 @@ typedef struct {
 typedef struct {
     wait_queue_head_t mbxWait;
     struct timer_list mbxTimer;
+    int timeout;
 } mbx_device_t;
 
 

@@ -254,7 +254,11 @@ static struct pci_driver universeII_driver = {
 //  DMA_timeout
 //
 //----------------------------------------------------------------------------
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 static void DMA_timeout(unsigned long ptr)
+#else
+static void DMA_timeout(struct timer_list *)
+#endif
 {
   wake_up_interruptible(&dmaWait);
   statistics.timeouts++;
@@ -265,10 +269,19 @@ static void DMA_timeout(unsigned long ptr)
 //  MBX_timeout
 //
 //----------------------------------------------------------------------------
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 static void MBX_timeout(unsigned long ptr)
+#else
+static void MBX_timeout(struct timer_list *t)
+#endif
 {
-  mbx_device[ptr].mbxTimer.data = 0xFFFF;
-  wake_up_interruptible(&mbx_device[ptr].mbxWait);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+  mbx_device_t *mbx = &mbx_device[ptr];
+#else
+  mbx_device_t *mbx = from_timer(mbx, t, mbxTimer);
+#endif
+  mbx->timeout = 1;
+  wake_up_interruptible(&mbx->mbxWait);
   statistics.timeouts++;
 }
 
@@ -277,10 +290,19 @@ static void MBX_timeout(unsigned long ptr)
 //  VIRQ_timeout
 //
 //----------------------------------------------------------------------------
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 static void VIRQ_timeout(unsigned long ptr)
+#else
+static void VIRQ_timeout(struct timer_list *t)
+#endif
 {
-  irq_device[ptr >> 8][ptr & 0xFF].virqTimer.data = 0xFFFF;
-  wake_up_interruptible(&irq_device[ptr >> 8][ptr & 0xFF].irqWait);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+  irq_device_t *irq_dev = &irq_device[ptr >> 8][ptr & 0xFF];
+#else
+  irq_device_t *irq_dev = from_timer(irq_dev, t, virqTimer);
+#endif
+  irq_dev->timeout = 1;
+  wake_up_interruptible(&irq_dev->irqWait);
   statistics.timeouts++;
 }
 
@@ -569,8 +591,7 @@ static void execDMA(u32 chain)
   DEFINE_WAIT(wait);
 
   DMA_timer.expires = jiffies + DMA_ACTIVE_TIMEOUT;  // We need a timer to
-  DMA_timer.function = DMA_timeout;                  // timeout DMA transfers
-  add_timer(&DMA_timer);
+  add_timer(&DMA_timer);                             // timeout DMA transfers
 
   prepare_to_wait(&dmaWait, &wait, TASK_INTERRUPTIBLE);
   writel(0x80006F0F | chain, baseaddr + DGCS);    // Start DMA, clear errors
@@ -1369,7 +1390,13 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
       irq_device[virq][vstatid].vmeAddrCl = 0;
 
     init_waitqueue_head(&irq_device[virq][vstatid].irqWait);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
     init_timer(&irq_device[virq][vstatid].virqTimer);
+    irq_device[virq][vstatid].virqTimer.function = VIRQ_timeout;
+    irq_device[virq][vstatid].virqTimer.data = (virq << 8) + vstatid;
+#else
+    timer_setup(&irq_device[virq][vstatid].virqTimer, VIRQ_timeout, 0);
+#endif
     irq_device[virq][vstatid].ok = minor + 1;
 
     break;
@@ -1438,8 +1465,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
       vTimer = &irq_device[vmeIrq][vmeStatus].virqTimer;
       vTimer->expires = jiffies + timeout;
-      vTimer->function = VIRQ_timeout;
-      vTimer->data = (vmeIrq << 8) + vmeStatus;
+      irq_device[vmeIrq][vmeStatus].timeout = 0;
     }
 
     prepare_to_wait(&irq_device[vmeIrq][vmeStatus].irqWait, &wait,
@@ -1457,7 +1483,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
     if (irqData.timeout > 0)
     {
       del_timer(vTimer);
-      if (irq_device[vmeIrq][vmeStatus].virqTimer.data == 0xFFFF)
+      if (irq_device[vmeIrq][vmeStatus].timeout)
         return -2;
     }
 
@@ -1505,8 +1531,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
     readl(baseaddr + LINT_EN);
 
     mbx_device[mbxNr].mbxTimer.expires = jiffies + (arg >> 16) * HZ;
-    mbx_device[mbxNr].mbxTimer.function = MBX_timeout;
-    mbx_device[mbxNr].mbxTimer.data = mbxNr;
+    mbx_device[mbxNr].timeout = 0;
     add_timer(&mbx_device[mbxNr].mbxTimer);
 
     prepare_to_wait(&mbx_device[mbxNr].mbxWait, &wait, TASK_INTERRUPTIBLE);
@@ -1523,7 +1548,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
     del_timer(&mbx_device[mbxNr].mbxTimer);
 
-    if (mbx_device[mbxNr].mbxTimer.data == 0xFFFF)
+    if (mbx_device[mbxNr].timeout)
       return -1;
 
     return readl(baseaddr + mbx[mbxNr]);
@@ -2342,10 +2367,23 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
   // Setup a DMA and MBX timer to timeout 'infinite' transfers or hangups
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
   init_timer(&DMA_timer);
+  DMA_timer.function = DMA_timeout;
+#else
+  timer_setup(&DMA_timer, DMA_timeout, 0);
+#endif
 
   for (i = 0; i < 4; i++)
+  {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
     init_timer(&mbx_device[i].mbxTimer);
+    mbx_device[i].mbxTimer.function = MBX_timeout;
+    mbx_device[i].mbxTimer.data = i;
+#else
+    timer_setup(&mbx_device[i].mbxTimer, MBX_timeout, 0);
+#endif
+  }
 
   // Initialize list for DMA command packet structures
 
