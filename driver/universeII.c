@@ -607,7 +607,7 @@ static void execDMA(u32 chain)
 //----------------------------------------------------------------------------
 static u32 getPciBaseAddr(u32 size)
 {
-#define MEM_START 0x40000000
+#define MEM_START 0x90000000
 #define MEM_STOP  0xF0000000
 
   u32 pciAddr, stepping = 0x01000000;
