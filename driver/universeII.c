@@ -45,8 +45,6 @@ static const char Version[] = "0.96 (June 2022)";
 #define VMIC
 #ifdef VMIC
 #include "vmic.h"
-static void __iomem *VmicBaseAddr;
-static unsigned int VmicBase;
 #endif
 
 //----------------------------------------------------------------------------
@@ -1957,12 +1955,11 @@ static void universeII_remove(struct pci_dev *pdev)
       iounmap(image[i].vBase);
 
   if (baseaddr != 0)
+  {
+    pci_release_region(universeII_dev, 0);
     iounmap(baseaddr);
+  }
 
-#ifdef VMIC
-  if (VmicBaseAddr != NULL)
-    iounmap(VmicBaseAddr);
-#endif
 
   unregister_proc();
   unregister_chrdev(UNI_MAJOR, driver_name);
@@ -2026,6 +2023,8 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
 #ifdef VMIC
   struct pci_dev *vmicPci = NULL;
+  void __iomem *VmicBaseAddr = NULL;
+  unsigned int VmicBase = 0;
 #endif
 
   printk("%s driver version %s\n", driver_name, Version);
@@ -2061,13 +2060,16 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   // This is a 4k wide memory area that needs to be mapped into the
   // kernel virtual memory space so we can access it.
 
-  pci_write_config_dword(universeII_dev, PCI_BS, CONFIG_REG_SPACE);
-  pci_read_config_dword(universeII_dev, PCI_BS, &ba);
+  ba = pci_resource_start(universeII_dev, 0); //BAR 0 is the BS register at PCI_BS
+  if (pci_request_region(universeII_dev, 0, driver_name))
+  {
+    printk("%s: Could not read PCI base adress register from UniverseII config space\n", driver_name);
+    return -2;
+  }
   baseaddr = (void __iomem *) ioremap(ba, 4096);
   if (!baseaddr)
   {
-    printk("%s: Ioremap failed to map UniverseII to kernel "
-        "space.\n", driver_name);
+    printk("%s: Ioremap failed to map UniverseII to kernel space.\n", driver_name);
     return -2;
   }
 
@@ -2177,14 +2179,26 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
     printk("%s: VMIC subsystem ID: %x\n", driver_name, vmicPci->subsystem_device);
 
-    pci_read_config_dword(vmicPci, VMIC_FPGA_BASE_ADDR_REG, &VmicBase);
-    VmicBaseAddr = ioremap(VmicBase, PAGE_SIZE);
-
-    if (VmicBaseAddr == NULL)
-      printk("%s: Mapping of VMIC registers failed!\n", driver_name);
+    VmicBase  = pci_resource_start(vmicPci, 0);
+    if (pci_request_region(vmicPci, 0, driver_name))
+      printk("%s: Could not read PCI base adress register from VMIC config cpace\n", driver_name);
     else
-      writew(VME_EN | BTO_EN | BTO_64 | MEC_BE | SEC_BE,
-          VmicBaseAddr + FPGA_COMM_OFFSET);
+    {
+      VmicBaseAddr = ioremap(VmicBase, PAGE_SIZE);
+
+      if (VmicBaseAddr == NULL)
+      {
+        printk("%s: Mapping of VMIC registers failed!\n", driver_name);
+      }
+      else
+      {
+        writew(VME_EN | BTO_EN | BTO_64 | MEC_BE | SEC_BE,
+            VmicBaseAddr + FPGA_COMM_OFFSET);
+
+        iounmap(VmicBaseAddr);
+      }
+      pci_release_region(vmicPci, 0);
+    }
   }
   else
     printk("%s: Can't find VMIC FPGA device!\n", driver_name);
@@ -2224,6 +2238,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   {
     printk("%s: Can't get assigned pci irq vector %02X\n", driver_name, universeII_dev->irq);
     iounmap(baseaddr);
+    pci_release_region(universeII_dev, 0);
     return -4;
   }
   else
@@ -2259,6 +2274,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
     printk("%s: Unable to allocate memory for DMA buffer!\n", driver_name);
     dmaBuf = 0;
     iounmap(baseaddr);
+    pci_release_region(universeII_dev, 0);
     return -5;
   }
   else
@@ -2299,6 +2315,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
     printk(KERN_WARNING "%s: Error getting Major Number %d for "
         "driver.\n", driver_name , UNI_MAJOR);
     iounmap(baseaddr);
+    pci_release_region(universeII_dev, 0);
     return -6;
   }
   universeII_cdev = cdev_alloc();
@@ -2309,6 +2326,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   {
     printk(KERN_WARNING "%s: cdev_all failed\n", driver_name);
     iounmap(baseaddr);
+    pci_release_region(universeII_dev, 0);
     return -6;
   }
 
@@ -2318,6 +2336,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   {
     printk(KERN_ERR "Error creating universeII class.\n");
     iounmap(baseaddr);
+    pci_release_region(universeII_dev, 0);
     return -6;
   }
 
