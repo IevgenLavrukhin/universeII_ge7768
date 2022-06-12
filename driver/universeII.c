@@ -2054,6 +2054,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   baseaddr = (void __iomem *) ioremap(ba, 4096);
   if (!baseaddr)
   {
+    pci_release_regions(universeII_dev);
     printk("%s: Ioremap failed to map UniverseII to kernel space.\n", driver_name);
     return -2;
   }
@@ -2062,6 +2063,9 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
   if (readl(baseaddr) != 0x000010E3)
   {
+    iounmap(baseaddr);
+    pci_release_regions(universeII_dev);
+    baseaddr = 0;
     printk("UniverseII chip failed to return PCI_ID in memory map.\n");
     return -3;
   }
