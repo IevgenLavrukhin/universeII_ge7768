@@ -255,7 +255,7 @@ static struct pci_driver universeII_driver = {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
 static void DMA_timeout(unsigned long ptr)
 #else
-static void DMA_timeout(struct timer_list *)
+static void DMA_timeout(struct timer_list *t)
 #endif
 {
   wake_up_interruptible(&dmaWait);
