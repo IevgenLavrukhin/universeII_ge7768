@@ -602,36 +602,6 @@ static void execDMA(u32 chain)
 
 //----------------------------------------------------------------------------
 //
-//  getPciBaseAddr()
-//
-//----------------------------------------------------------------------------
-static u32 getPciBaseAddr(u32 size)
-{
-#define MEM_START 0x90000000
-#define MEM_STOP  0xF0000000
-
-  u32 pciAddr, stepping = 0x01000000;
-
-  for (pciAddr = MEM_START; pciAddr < MEM_STOP; pciAddr += stepping)
-    if (request_mem_region(pciAddr, size, driver_name))
-      break;
-
-  if (pciAddr >= MEM_STOP)
-  {
-    stepping /= 10;
-    for (pciAddr = MEM_START; pciAddr < MEM_STOP; pciAddr += stepping)
-      if (request_mem_region(pciAddr, size, driver_name))
-        break;
-  }
-
-  if (pciAddr >= MEM_STOP)
-    return 0;
-
-  return pciAddr;
-}
-
-//----------------------------------------------------------------------------
-//
 //  universeII_read()
 //
 //----------------------------------------------------------------------------
@@ -1096,7 +1066,10 @@ static int universeII_release(struct inode *inode, struct file *file)
   }
 
   if (minor < MAX_IMAGE)             // release pci mapping when master image
-    release_mem_region(image[minor].phys_start, image[minor].size);
+  {
+    release_resource(&image[minor].masterRes);
+    memset(&image[minor].masterRes, 0, sizeof(image[minor].masterRes));
+  }
 
   image[minor].opened = 0;
   image[minor].okToWrite = 0;
@@ -1171,14 +1144,19 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
     if (!iRegs.ms)
     {   // master image
-      pciBase = getPciBaseAddr(iRegs.size);
-      if (pciBase == 0)
+      image[minor].masterRes.name = pci_driver_name;
+      image[minor].masterRes.start = 0;
+      image[minor].masterRes.end = iRegs.size;
+      image[minor].masterRes.flags = IORESOURCE_MEM;
+
+      if (pci_bus_alloc_resource(universeII_dev->bus, &image[minor].masterRes, iRegs.size, 0x10000, PCIBIOS_MIN_MEM, 0, NULL, NULL))
       {
         spin_unlock(&set_image_lock);
         printk("%s: Not enough iomem found for "
             "requested image size!\n", driver_name);
         return -3;
       }
+      pciBase = image[minor].masterRes.start;
     }
     else
     {    // slave image
@@ -1215,7 +1193,10 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
           {
             spin_unlock(&set_image_lock);
             if (!iRegs.ms)
-              release_mem_region(pciBase, iRegs.size);
+            {
+              release_resource(&image[minor].masterRes);
+              memset(&image[minor].masterRes, 0, sizeof(image[minor].masterRes));
+            }
             printk("%s: Overlap of image %d and %d !\n", driver_name,
                 i, minor);
             printk("imageStart1 = %x, imageEnd1 = %x, "
@@ -1261,7 +1242,10 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
       image[minor].okToWrite = 0;
       image[minor].opened = 2;
       if (!iRegs.ms)
-        release_mem_region(image[minor].phys_start, iRegs.size);
+      {
+        release_resource(&image[minor].masterRes);
+        memset(&image[minor].masterRes, 0, sizeof(image[minor].masterRes));
+      }
       printk("%s: IOCTL_SET_IMAGE, Error in ioremap!\n", driver_name);
       return -7;
     }

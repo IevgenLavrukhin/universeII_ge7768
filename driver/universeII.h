@@ -30,8 +30,13 @@ typedef struct {
     void __iomem *vBase;        // Virtual image base PCI address
     int okToWrite;              // Indicates that image is ready to be used
     int opened;                 // Indicated different states during open process
-    void __iomem *slaveBuf;     // Slave buffer address in kernel space
-    dma_addr_t buffer;          // Slave buffer address in PCI address space
+    union {                     // different parameters for master and slave images
+      struct resource masterRes;// Master pci bus resource
+      struct {
+        void __iomem *slaveBuf; // Slave buffer address in kernel space
+        dma_addr_t buffer;      // Slave buffer address in PCI address space
+      };
+    };
 } image_desc_t;
 
 
