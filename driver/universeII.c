@@ -166,6 +166,9 @@ static const int mbx[4] = { MAILBOX0, MAILBOX1, MAILBOX2, MAILBOX3 };
 // DMA is allowed to be active
 
 static struct pci_dev *universeII_dev = NULL;
+#ifdef VMIC
+static struct pci_dev *vmic_dev = NULL;
+#endif
 
 // Tundra chip and image internal handling addresses
 
@@ -1940,10 +1943,13 @@ static void universeII_remove(struct pci_dev *pdev)
 
   if (baseaddr != 0)
   {
-    pci_release_region(universeII_dev, 0);
+    pci_release_regions(universeII_dev);
     iounmap(baseaddr);
   }
-
+#ifdef VMIC
+  if (vmic_dev != NULL)
+    pci_release_regions(vmic_dev);
+#endif
 
   unregister_proc();
   unregister_chrdev(UNI_MAJOR, driver_name);
@@ -2005,12 +2011,6 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   char name[12];
   int retval;
 
-#ifdef VMIC
-  struct pci_dev *vmicPci = NULL;
-  void __iomem *VmicBaseAddr = NULL;
-  unsigned int VmicBase = 0;
-#endif
-
   printk("%s driver version %s\n", driver_name, Version);
 
   universeII_dev = pdev;
@@ -2043,13 +2043,14 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   // Setup Universe Config Space
   // This is a 4k wide memory area that needs to be mapped into the
   // kernel virtual memory space so we can access it.
-
-  ba = pci_resource_start(universeII_dev, 0); //BAR 0 is the BS register at PCI_BS
-  if (pci_request_region(universeII_dev, 0, driver_name))
+  // Note: even though we only map te first BAR, we need to request all BARs!
+  //       otherwise, those addresses might be used for the master images
+  if (pci_request_regions(universeII_dev, driver_name))
   {
     printk("%s: Could not read PCI base adress register from UniverseII config space\n", driver_name);
     return -2;
   }
+  ba = pci_resource_start(universeII_dev, 0); //BAR 0 is the BS register at PCI_BS
   baseaddr = (void __iomem *) ioremap(ba, 4096);
   if (!baseaddr)
   {
@@ -2156,18 +2157,23 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   // Enable byte-lane-swapping for master and slave images and VMEbus
   // access which is disabled by default!!!
 
-  if ((vmicPci = pci_get_device(VMIC_VEND_ID, VMIC_FPGA_DEVICE_ID1, NULL)) ||
-      (vmicPci = pci_get_device(VMIC_VEND_ID, VMIC_FPGA_DEVICE_ID2, NULL)) ||
-      (vmicPci = pci_get_device(VMIC_VEND_ID, VMIC_FPGA_DEVICE_ID3, NULL)))
+  if ((vmic_dev = pci_get_device(VMIC_VEND_ID, VMIC_FPGA_DEVICE_ID1, NULL)) ||
+      (vmic_dev = pci_get_device(VMIC_VEND_ID, VMIC_FPGA_DEVICE_ID2, NULL)) ||
+      (vmic_dev = pci_get_device(VMIC_VEND_ID, VMIC_FPGA_DEVICE_ID3, NULL)))
   {
 
-    printk("%s: VMIC subsystem ID: %x\n", driver_name, vmicPci->subsystem_device);
+    printk("%s: VMIC subsystem ID: %x\n", driver_name, vmic_dev->subsystem_device);
 
-    VmicBase  = pci_resource_start(vmicPci, 0);
-    if (pci_request_region(vmicPci, 0, driver_name))
+    // Note: even though we only map te first BAR, we need to request all BARs!
+    //       otherwise, those addresses might be used for the master images
+    if (pci_request_regions(vmic_dev, driver_name))
       printk("%s: Could not read PCI base adress register from VMIC config cpace\n", driver_name);
     else
     {
+      unsigned int VmicBase;
+      static void __iomem *VmicBaseAddr;
+
+      VmicBase = pci_resource_start(vmic_dev, 0);
       VmicBaseAddr = ioremap(VmicBase, PAGE_SIZE);
 
       if (VmicBaseAddr == NULL)
@@ -2181,7 +2187,6 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
         iounmap(VmicBaseAddr);
       }
-      pci_release_region(vmicPci, 0);
     }
   }
   else
@@ -2222,7 +2227,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   {
     printk("%s: Can't get assigned pci irq vector %02X\n", driver_name, universeII_dev->irq);
     iounmap(baseaddr);
-    pci_release_region(universeII_dev, 0);
+    pci_release_regions(universeII_dev);
+#ifdef VMIC
+    if (vmic_dev != NULL)
+      pci_release_regions(vmic_dev);
+#endif
     return -4;
   }
   else
@@ -2258,7 +2267,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
     printk("%s: Unable to allocate memory for DMA buffer!\n", driver_name);
     dmaBuf = 0;
     iounmap(baseaddr);
-    pci_release_region(universeII_dev, 0);
+    pci_release_regions(universeII_dev);
+#ifdef VMIC
+    if (vmic_dev != NULL)
+      pci_release_regions(vmic_dev);
+#endif
     return -5;
   }
   else
@@ -2299,7 +2312,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
     printk(KERN_WARNING "%s: Error getting Major Number %d for "
         "driver.\n", driver_name , UNI_MAJOR);
     iounmap(baseaddr);
-    pci_release_region(universeII_dev, 0);
+    pci_release_regions(universeII_dev);
+#ifdef VMIC
+    if (vmic_dev != NULL)
+      pci_release_regions(vmic_dev);
+#endif
     return -6;
   }
   universeII_cdev = cdev_alloc();
@@ -2310,7 +2327,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   {
     printk(KERN_WARNING "%s: cdev_all failed\n", driver_name);
     iounmap(baseaddr);
-    pci_release_region(universeII_dev, 0);
+    pci_release_regions(universeII_dev);
+#ifdef VMIC
+    if (vmic_dev != NULL)
+      pci_release_regions(vmic_dev);
+#endif
     return -6;
   }
 
@@ -2320,7 +2341,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   {
     printk(KERN_ERR "Error creating universeII class.\n");
     iounmap(baseaddr);
-    pci_release_region(universeII_dev, 0);
+    pci_release_regions(universeII_dev);
+#ifdef VMIC
+    if (vmic_dev != NULL)
+      pci_release_regions(vmic_dev);
+#endif
     return -6;
   }
 
