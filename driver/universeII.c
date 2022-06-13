@@ -1356,8 +1356,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
     if (irq_device[virq][vstatid].ok)
     {
-      printk("%s: irq/status combination is already in "
-          "use !\n", driver_name);
+      printk("%s: IOCTL_SET_IRQ: irq/status combination is already in use!\n", driver_name);
       return -2;
     }
 
@@ -1422,13 +1421,13 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
     if ((virq < 0) || (virq > 6) || (vstatid < 0) || (vstatid > 255))
     {
-      printk("%s: IOCTL_SET_IRQ: Parameter out of range!\n", driver_name);
+      printk("%s: IOCTL_FREE_IRQ: Parameter out of range!\n", driver_name);
       return -1;
     }
 
     if (irq_device[virq][vstatid].ok == 0)
     {
-      printk("%s: irq/status combination not found!\n", driver_name);
+      printk("%s: IOCTL_FREE_IRQ: irq/status combination not found!\n", driver_name);
       return -2;
     }
 
@@ -1457,7 +1456,13 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
 
     if ((vmeIrq < 0) || (vmeIrq > 6) || (vmeStatus < 0) || (vmeStatus > 255))
     {
-      printk("%s: IOCTL_SET_IRQ: Parameter out of range!\n", driver_name);
+      printk("%s: IOCTL_WAIT_IRQ: Parameter out of range!\n", driver_name);
+      return -1;
+    }
+
+    if (!irq_device[vmeIrq][vmeStatus].ok)
+    {
+      printk("%s: IOCTL_WAIT_IRQ: irq/status combination not found.\n", driver_name);
       return -1;
     }
 
