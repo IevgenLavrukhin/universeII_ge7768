@@ -510,6 +510,23 @@ static int universeII_procinfo(struct seq_file *p, void *data)
 #endif
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
+/*because proc_create_single is not yet available, we need to create a wrapper for single_open */
+static int universeII_procopen(struct inode *inode_ptr, struct file *fp)
+{
+  return single_open(fp, universeII_procinfo, PDE_DATA(inode_ptr));
+}
+
+static struct file_operations universeII_procfops = {
+  .owner = THIS_MODULE,
+  .open = universeII_procopen,
+  .read = seq_read,
+  .llseek = seq_lseek,
+  .release = single_release,
+};
+#endif
+
+
 //----------------------------------------------------------------------------
 //
 //  register_proc()
@@ -517,10 +534,12 @@ static int universeII_procinfo(struct seq_file *p, void *data)
 //----------------------------------------------------------------------------
 static void register_proc(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
-  proc_create_single(driver_name, 0, NULL, universeII_procinfo);
-#else
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 10, 0)
   create_proc_read_entry(driver_name, 0, NULL, universeII_procinfo, NULL);
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 18, 0)
+  proc_create(driver_name, 0, NULL, &universeII_procfops);
+#else
+  proc_create_single(driver_name, 0, NULL, universeII_procinfo);
 #endif
 }
 
