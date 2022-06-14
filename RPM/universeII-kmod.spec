@@ -5,7 +5,7 @@
 %{!?kversion: %define kversion `uname -r`}
 
 Name:    %{kmod_name}-kmod
-Version: 0.95
+Version: 0.96
 Release: 1%{?dist}
 Group:   System Environment/Kernel
 License: GPLv2
@@ -19,7 +19,7 @@ ExclusiveArch: i686 x86_64
 Source0:  %{kmod_name}-%{version}.tar.bz2
 Source1:  99-universeII.rules
 Source5:  gpl-2.0.txt
-Source10: kmodtool-%{kmod_name}-el6.sh
+Source10: kmodtool-%{kmod_name}.sh
 
 # Magic hidden here.
 %{expand:%(sh %{SOURCE10} rpmtemplate %{kmod_name} %{kversion} "")}
@@ -65,5 +65,8 @@ find %{buildroot} -type f -name \*.ko -exec %{__chmod} u+x \{\} \;
 %{__rm} -rf %{buildroot}
 
 %changelog
+* Tue Jun 14 2022 Jan Hartmann <hartmann@hiskp.uni-bonn.de> - 0.96-1
+- updated universeII to work with newer Kernels
+
 * Wed Aug 22 2012 Christian Funke <funke@hiskp.uni-bonn.de> - 0.95-1
 - Initial build of package for RHEL6/CentOS6/SL6

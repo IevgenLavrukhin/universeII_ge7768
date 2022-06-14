@@ -9,6 +9,7 @@
 # Copyright (c) 2003-2010 Ville Skyttä <ville.skytta@iki.fi>,
 #                         Thorsten Leemhuis <fedora@leemhuis.info>
 #                         Jon Masters <jcm@redhat.com>
+# Copyright (c) 2012-2013 Jiri Benc <jbenc@redhat.com>
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -32,8 +33,8 @@
 # Changelog:
 #
 #            2010/07/28 - Add fixes for filelists in line with LF standard
-#                       - Remove now defunct "framepointer" kernel variant
-#                       - Change version to "rhel6-rh2" as a consequence.
+#			- Remove now defunct "framepointer" kernel variant
+#			- Change version to "rhel6-rh2" as a consequence.
 #
 #            2010/01/10 - Simplified for RHEL6. We are working on upstream
 #                         moving to a newer format and in any case do not
@@ -42,17 +43,33 @@
 shopt -s extglob
 
 myprog="kmodtool"
-myver="rhel63"
+myver="0.10.10_kmp2"
 knownvariants=@(debug|kdump)
 kmod_name=
 kver=
 verrel=
 variant=
 
+get_kernel_release ()
+{
+  if [[ -z $1 ]]; then
+    uname -r
+    return
+  fi
+  local arch=$(arch)
+  local verrel=${1%.$arch}
+  local verprefix=${verrel%.*}
+  local versuffix=${verrel#$verprefix}
+  verrel=$(ls -Ud /usr/src/kernels/$verprefix*$versuffix.$arch | sort -V | tail -n 1)
+  verrel=${verrel##*/}
+  [[ -z $verrel ]] && verrel=$1.$arch
+  echo "$verrel"
+}
+
 get_verrel ()
 {
-  verrel=${1:-$(uname -r)}
-  verrel=${verrel%%$knownvariants}
+  verrel=$(get_kernel_release "$1")
+  verrel=${verrel/%.$knownvariants/}
 }
 
 print_verrel ()
@@ -61,11 +78,17 @@ print_verrel ()
   echo "${verrel}"
 }
 
+get_verrel_for_deps ()
+{
+  verrel_dep=${1:-$(uname -r)}
+  verrel_dep=${verrel_dep/%.$knownvariants/}
+}
+
 get_variant ()
 {
   get_verrel $@
-  variant=${1:-$(uname -r)}
-  variant=${variant##$verrel}
+  variant=$(get_kernel_release "$1")
+  variant=${variant/#$verrel?(.)/}
   variant=${variant:-'""'}
 }
 
@@ -99,6 +122,7 @@ get_filelist() {
 		echo "/lib/modules/${verrel}${dotvariant}"
 	fi
 }
+	
 
 get_rpmtemplate ()
 {
@@ -123,12 +147,12 @@ get_rpmtemplate ()
     if [ ! -z "$kmod_release" ]; then
         echo "Release: %{kmod_release}"
     fi
-
-    # Turn off the internal dep generator so we will use the kmod scripts.
+    
+    # Turn of the internal dep generator so we will use the kmod scripts.
     echo "%global _use_internal_dependency_generator 0"
 
     cat <<EOF
-Provides:         kabi-modules = ${verrel}${dotvariant}
+Provides:         kernel-modules >= ${verrel_dep}${dotvariant}
 Provides:         ${kmod_name}-kmod = %{?epoch:%{epoch}:}%{version}-%{release}
 Requires(post):   /sbin/depmod
 Requires(postun): /sbin/depmod
@@ -146,8 +170,9 @@ EOF
 
 cat <<EOF
 %description   -n kmod-${kmod_name}${dashvariant}
-This package provides the ${kmod_name} kernel module(s) built
-for the Linux kernel using the %{_target_cpu} family of processors.
+This package provides the ${kmod_name} kernel modules built for
+the Linux kernel ${verrel}${dotvariant} for the %{_target_cpu}
+family of processors.
 EOF
 
 ##############################################################################
@@ -157,41 +182,38 @@ EOF
 
 cat <<EOF
 %post          -n kmod-${kmod_name}${dashvariant}
-echo "Working. This may take some time ..."
 if [ -e "/boot/System.map-${verrel}${dotvariant}" ]; then
     /sbin/depmod -aeF "/boot/System.map-${verrel}${dotvariant}" "${verrel}${dotvariant}" > /dev/null || :
 fi
+
 modules=( \$(find /lib/modules/${verrel}${dotvariant}/extra/${kmod_name} | grep '\.ko$') )
 if [ -x "/sbin/weak-modules" ]; then
-    printf '%s\n' "\${modules[@]}" | /sbin/weak-modules --add-modules
+    printf '%s\n' "\${modules[@]}" \
+    | /sbin/weak-modules --add-modules
 fi
-/sbin/udevadm control --reload-rules
-/sbin/udevadm trigger
-/sbin/modprobe universeII
-echo "Done."
 EOF
 
 cat <<EOF
 %preun         -n kmod-${kmod_name}${dashvariant}
 rpm -ql kmod-${kmod_name}${dashvariant}-%{version}-%{release}.$(arch) | grep '\.ko$' > /var/run/rpm-kmod-${kmod_name}${dashvariant}-modules
 EOF
-
+        
 cat <<EOF
 %postun        -n kmod-${kmod_name}${dashvariant}
-echo "Working. This may take some time ..."
 if [ -e "/boot/System.map-${verrel}${dotvariant}" ]; then
     /sbin/depmod -aeF "/boot/System.map-${verrel}${dotvariant}" "${verrel}${dotvariant}" > /dev/null || :
 fi
+
 modules=( \$(cat /var/run/rpm-kmod-${kmod_name}${dashvariant}-modules) )
 rm /var/run/rpm-kmod-${kmod_name}${dashvariant}-modules
 if [ -x "/sbin/weak-modules" ]; then
-    printf '%s\n' "\${modules[@]}" | /sbin/weak-modules --remove-modules
+    printf '%s\n' "\${modules[@]}" \
+    | /sbin/weak-modules --remove-modules
 fi
-/sbin/rmmod universeII
-echo "Done."
 EOF
 
 echo "%files         -n kmod-${kmod_name}${dashvariant}"
+
 if [ "" == "$override_filelist" ];
 then
     echo "%defattr(644,root,root,755)"
@@ -210,6 +232,8 @@ print_rpmtemplate ()
   shift
   kver="${1}"
   get_verrel "${1}"
+  get_verrel_for_deps "${1}"
+  [[ -z $kver ]] && kver=$verrel
   shift
   if [ -z "${kmod_name}" ] ; then
     echo "Please provide the kmodule-name as first parameter." >&2
@@ -221,7 +245,7 @@ print_rpmtemplate ()
     echo "Couldn't find out the verrel." >&2
     exit 2
   fi
-
+  
   for variant in "$@" ; do
       if [ "default" == "$variant" ];
       then
@@ -279,3 +303,10 @@ while [ "${1}" ] ; do
       ;;
   esac
 done
+
+# Local variables:
+# mode: sh
+# sh-indentation: 2
+# indent-tabs-mode: nil
+# End:
+# ex: ts=2 sw=2 et

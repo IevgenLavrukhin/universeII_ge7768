@@ -1,0 +1,4 @@
+How to crate RPM file for the univserseII kernel module:
+
+- just run `make`
+- if all goes well, the rpm will be located in rpmbuild/RPMS
