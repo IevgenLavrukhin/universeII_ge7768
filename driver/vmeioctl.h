@@ -42,6 +42,7 @@
 /* DMA defines */
 #define IOCTL_REQUEST_DMA  0xF201
 #define IOCTL_RELEASE_DMA  0xF202
+#define IOCTL_DMA_BLT_BERR 0xF203
 
 
 /* Defines for DMA linked list operations */
@@ -68,55 +69,55 @@
 
 typedef struct
 {
-    int ms;
-    unsigned int base;
-    unsigned int size;
+  int ms;
+  unsigned int base;
+  unsigned int size;
 } image_regs_t;
 
 
 typedef struct
 {
-    unsigned int addr;
-    unsigned int count;
-    int vas;
-    int vdw;
-    int dma_ctl;
-    int bufNr;
+  unsigned int addr;
+  unsigned int count;
+  int vas;
+  int vdw;
+  int dma_ctl;
+  int bufNr;
 } dma_param_t;
 
 
 typedef struct
 {
-    unsigned int dctl;
-    unsigned int dtbc;
-    unsigned int dva;
-    int list;
+  unsigned int dctl;
+  unsigned int dtbc;
+  unsigned int dva;
+  int list;
 } list_packet_t;
 
 
 typedef struct
 {
-    int vmeIrq;
-    int vmeStatus;
-    int vmeAddrSt;
-    int vmeValSt;
-    int vmeAddrCl;
-    int vmeValCl;
+  int vmeIrq;
+  int vmeStatus;
+  int vmeAddrSt;
+  int vmeValSt;
+  int vmeAddrCl;
+  int vmeValCl;
 } irq_setup_t;
 
 
 typedef struct
 {
-    int irqLevel;
-    int statusID;
-    unsigned long timeout;
+  int irqLevel;
+  int statusID;
+  unsigned long timeout;
 } irq_wait_t;
 
 
 typedef struct
 {
-    unsigned int addr;
-    unsigned int mode;
+  unsigned int addr;
+  unsigned int mode;
 } there_data_t;
 
 #endif

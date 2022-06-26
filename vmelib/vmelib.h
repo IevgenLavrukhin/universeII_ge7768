@@ -112,6 +112,7 @@ public:
 
   uintptr_t requestDMA(void);
   uintptr_t requestDMA(int);
+  int enableBltUntilBerr(void);
   uintptr_t getDMABase(void);
   void releaseDMA(void);
   int DMAread(unsigned int source, unsigned int count, int vas, int vdw);

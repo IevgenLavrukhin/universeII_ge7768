@@ -5,7 +5,7 @@
 %{!?kversion: %define kversion `uname -r`}
 
 Name:    %{kmod_name}-kmod
-Version: 0.96
+Version: 0.97
 Release: 1%{?dist}
 Group:   System Environment/Kernel
 License: GPLv2
@@ -65,6 +65,9 @@ find %{buildroot} -type f -name \*.ko -exec %{__chmod} u+x \{\} \;
 %{__rm} -rf %{buildroot}
 
 %changelog
+* Sun Jun 26 2022 Jan Hartmann <hartmann@hiskp.uni-bonn.de> - 0.97-1
+- added ioctl to enable DMA BLT until VME BERR
+
 * Tue Jun 14 2022 Jan Hartmann <hartmann@hiskp.uni-bonn.de> - 0.96-1
 - updated universeII to work with newer Kernels
 

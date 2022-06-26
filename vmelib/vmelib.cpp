@@ -546,6 +546,14 @@ uintptr_t VMEBridge::requestDMA(void)
   return requestDMA(1);
 }
 
+//----------------------------------------------------------------------------
+//  To be called after requestDMA, active until releaseDMA: A VME BERR during DMAread is not treated as an error.
+//----------------------------------------------------------------------------
+int VMEBridge::enableBltUntilBerr(void)
+{
+  return ioctl(dma_handle, IOCTL_DMA_BLT_BERR, 0);
+}
+
 uintptr_t VMEBridge::getDMABase(void)
 {
   return dmaImageBase;

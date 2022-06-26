@@ -37,10 +37,10 @@
 #include "vmeioctl.h"
 
 MODULE_DESCRIPTION("VME driver for the Tundra Universe II PCI to VME bridge");
-MODULE_AUTHOR("Andreas Ehmanns <universeII@gmx.de>");
+MODULE_AUTHOR("Andreas Ehmanns <universeII@gmx.de>, Jan Hartmann <hartmann@hiskp.uni-bonn.de");
 MODULE_LICENSE("GPL");
 
-static const char Version[] = "0.96 (June 2022)";
+static const char Version[] = "0.97 (June 2022)";
 
 #define VMIC
 #ifdef VMIC
@@ -180,6 +180,7 @@ static dma_addr_t dmaHandle = 0;
 static unsigned int dmaBufSize = 0;      // Size of one DMA buffer
 static unsigned int dma_dctl;            // DCTL register for DMA
 static int dma_in_use = 0;
+static int dma_blt_berr = 0;            // for DMA BLT until BERR
 
 // All image related information like start address, end address, ...
 static image_desc_t image[18];
@@ -583,19 +584,15 @@ static int testAndClearDMAErrors(void)
 
   if (!(tmp & 0x00000800))      // Check if DMA status is done
   {
-    printk("%s: DMA error, DGCS: %08x !\n", driver_name, tmp);
     if (tmp & 0x00008000)
-    {   // Check for timeout
+    {   // Check for timeout (i.e. ACT bit still set)
       printk("%s: DMA stopped with timeout. DGCS = %08x !\n", driver_name, tmp);
       writel(0x40000000, baseaddr + DGCS);    // Stop DMA
     }
 
-    if (tmp & 0x00006700)     // Check for errors
-      printk("%s: DMA write stopped with error. DGCS = %08x !\n", driver_name, tmp);
-
-    writel(0x00006F00, baseaddr + DGCS);    // Clear all errors and
-    statistics.dmaErrors++;                 // Disable all DMA irqs
-    return -1;
+    writel(0x00006F00, baseaddr + DGCS);    // Clear all errors and disable all DMA irqs
+    statistics.dmaErrors++;
+    return (tmp & 0x0000E700);
   }
 
   return 0;
@@ -672,9 +669,8 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
     dma_dctl = dmaParam.dma_ctl | dmaParam.vas | dmaParam.vdw;
     pci = dmaHandle + dmaBufSize * dmaParam.bufNr;
 
-    if ((pci < dmaHandle) ||
-        (pci + dmaParam.count > dmaHandle + PCI_BUF_SIZE))
-    return -2;
+    if ((pci < dmaHandle) || (pci + dmaParam.count > dmaHandle + PCI_BUF_SIZE))
+      return -2;
 
     // Check that DMA is idle
     if (readl(baseaddr + DGCS) & 0x00008000)
@@ -689,7 +685,7 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
 
     // lower 3 bits of VME and PCI address must be identical,
     if ((pci & 0x7) == (dmaParam.addr & 0x7))
-    writel(pci, baseaddr + DLA);// PCI address
+      writel(pci, baseaddr + DLA);// PCI address
     else
     {
       offset = (((dmaParam.addr & 0x7) + 0x8) - (pci & 0x7)) & 0x7;
@@ -698,10 +694,18 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
 
     execDMA(0);                          // Start and wait for DMA
 
-    if (testAndClearDMAErrors())// Check for DMA errors
-    okcount = -1;
+    res = testAndClearDMAErrors();
+    if (dma_blt_berr && (res == 0x200))
+    {
+      // DMA BLT until VME BERR is valild (but bad practice)
+      // If we read something before the BERR, it's a success.
+      if (dmaParam.count > readl(baseaddr + DTBC))
+        res = 0;
+    }
+    if (res)
+      okcount = -1;
     else
-    okcount = offset;
+      okcount = offset;
 
     break;
 
@@ -752,9 +756,9 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
           spin_unlock(&vme_lock);
 
           if (berr)
-          return okcount;
+            return okcount;
           else
-          okcount += 2;
+            okcount += 2;
 
           res = __copy_to_user(temp, &vs, 2);
           if(res)
@@ -777,9 +781,9 @@ static ssize_t universeII_read(struct file *file, char __user *buf,
           spin_unlock(&vme_lock);
 
           if (berr)
-          return okcount;
+            return okcount;
           else
-          okcount += 4;
+            okcount += 4;
 
           res = __copy_to_user(temp, &vi, 4);
           if(res)
@@ -850,9 +854,8 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
     dma_dctl = dmaParam.dma_ctl | dmaParam.vas | dmaParam.vdw;
     pci = dmaHandle + dmaBufSize * dmaParam.bufNr;
 
-    if ((pci < dmaHandle) ||
-        (pci + dmaParam.count > dmaHandle + PCI_BUF_SIZE))
-    return -2;
+    if ((pci < dmaHandle) || (pci + dmaParam.count > dmaHandle + PCI_BUF_SIZE))
+      return -2;
 
     // Check that DMA is idle
     if (readl(baseaddr + DGCS) & 0x00008000)
@@ -867,7 +870,9 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
 
     // lower 3 bits of VME and PCI address must be identical,
     if ((pci & 0x7) == (dmaParam.addr & 0x7))
-    writel(pci, baseaddr + DLA);// PCI address
+    {
+      writel(pci, baseaddr + DLA);// PCI address
+    }
     else
     {
       offset = (((dmaParam.addr & 0x7) + 0x8) - (pci & 0x7)) & 0x7;
@@ -877,9 +882,9 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
     execDMA(0);                          // Start and wait for DMA
 
     if (testAndClearDMAErrors())// Check for DMA errors
-    okcount = -1;
+      okcount = -1;
     else
-    okcount = offset;
+      okcount = offset;
 
     break;
 
@@ -887,7 +892,7 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
     if (image[minor].okToWrite)
     {
       if ((*ppos & 0x0FFFFFFF) + count > image[minor].size)
-      return -1;
+        return -1;
 
       image_ptr = image[minor].vBase + (*ppos & 0x0FFFFFFF);
 
@@ -910,9 +915,9 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
           spin_unlock(&vme_lock);
 
           if (berr)
-          return okcount;
+            return okcount;
           else
-          okcount++;
+            okcount++;
 
           image_ptr++;
           temp++;
@@ -935,9 +940,9 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
           spin_unlock(&vme_lock);
 
           if (berr)
-          return okcount;
+            return okcount;
           else
-          okcount += 2;
+            okcount += 2;
 
           image_ptr += 2;
           temp += 2;
@@ -960,9 +965,9 @@ static ssize_t universeII_write(struct file *file, const char __user *buf,
           spin_unlock(&vme_lock);
 
           if (berr)
-          return okcount;
+            return okcount;
           else
-          okcount += 4;
+            okcount += 4;
 
           image_ptr += 4;
           temp += 4;
@@ -1836,6 +1841,13 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
   case IOCTL_RELEASE_DMA:
   {
     dma_in_use = 0;
+    dma_blt_berr = 0;
+    break;
+  }
+
+  case IOCTL_DMA_BLT_BERR:
+  {
+    dma_blt_berr = 1;
     break;
   }
 
@@ -1872,6 +1884,7 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
       // errors and
       // disable DMA irqs
       dma_in_use = 0;
+      dma_blt_berr = 0;
     }
 
     // remove all existing command packet lists
@@ -2426,6 +2439,7 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
   register_proc();
 
   dma_in_use = 0;
+  dma_blt_berr = 0;
 
   // Setup a DMA and MBX timer to timeout 'infinite' transfers or hangups
 
