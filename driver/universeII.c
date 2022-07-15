@@ -1085,12 +1085,12 @@ static int universeII_release(struct inode *inode, struct file *file)
   {
     iounmap(image[minor].vBase);
     image[minor].vBase = NULL;
-  }
 
-  if (minor < MAX_IMAGE)             // release pci mapping when master image
-  {
-    release_resource(&image[minor].masterRes);
-    memset(&image[minor].masterRes, 0, sizeof(image[minor].masterRes));
+    if (minor < MAX_IMAGE && image[minor].masterRes.start) // release pci mapping when master image
+    {
+      release_resource(&image[minor].masterRes);
+      memset(&image[minor].masterRes, 0, sizeof(image[minor].masterRes));
+    }
   }
 
   image[minor].opened = 0;
@@ -1911,6 +1911,12 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
       {
         iounmap(image[i].vBase);
         image[i].vBase = NULL;
+
+        if (image[i].masterRes.start)
+        {
+          release_resource(&image[i].masterRes);
+          memset(&image[i].masterRes, 0, sizeof(image[i].masterRes));
+        }
       }
 
       image[i].opened = 0;
