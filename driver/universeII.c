@@ -40,7 +40,7 @@ MODULE_DESCRIPTION("VME driver for the Tundra Universe II PCI to VME bridge");
 MODULE_AUTHOR("Andreas Ehmanns <universeII@gmx.de>, Jan Hartmann <hartmann@hiskp.uni-bonn.de");
 MODULE_LICENSE("GPL");
 
-static const char Version[] = "0.97 (June 2022)";
+static const char Version[] = "0.98 (June 2023)";
 
 #define VMIC
 #ifdef VMIC
@@ -1625,18 +1625,22 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
     if (ptr == NULL)
     {
       cpLists[lpacket.list].commandPacket = newP;
-      cpLists[lpacket.list].start =
-          pci_map_single(universeII_dev, &(newP->dcp.dctl),
-              sizeof(*newP), DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+      cpLists[lpacket.list].start = dma_map_single(&universeII_dev->dev, &(newP->dcp.dctl), sizeof(*newP), DMA_BIDIRECTIONAL);
+#else
+      cpLists[lpacket.list].start = pci_map_single(universeII_dev, &(newP->dcp.dctl), sizeof(*newP), DMA_BIDIRECTIONAL);
+#endif
     }
     else
     {
       while (ptr->next != NULL)     // find end of list
         ptr = ptr->next;
       ptr->next = newP;              // append new command packet
-      ptr->dcp.dcpp =
-          pci_map_single(universeII_dev, &(newP->dcp.dctl),
-              sizeof(*newP), DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+      ptr->dcp.dcpp = dma_map_single(&universeII_dev->dev, &(newP->dcp.dctl), sizeof(*newP), DMA_BIDIRECTIONAL);
+#else
+      ptr->dcp.dcpp = pci_map_single(universeII_dev, &(newP->dcp.dctl), sizeof(*newP), DMA_BIDIRECTIONAL);
+#endif
 
       if (ptr->dcp.dcpp & 0x0000001F)
       {
@@ -1668,8 +1672,11 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
     if (dla + offset + lpacket.dtbc > dmaHandle + PCI_BUF_SIZE)
     {
       ptr->next = NULL;
-      pci_unmap_single(universeII_dev, ptr->dcp.dcpp,
-          sizeof(*newP), DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+      dma_unmap_single(&universeII_dev->dev, ptr->dcp.dcpp, sizeof(*newP), DMA_BIDIRECTIONAL);
+#else
+      pci_unmap_single(universeII_dev, ptr->dcp.dcpp, sizeof(*newP), DMA_BIDIRECTIONAL);
+#endif
       ptr->dcp.dcpp = 0x00000001;
       kfree(newP);
       printk("%s: DMA linked list packet exceeds global DMA "
@@ -1734,8 +1741,11 @@ static long universeII_ioctl(struct file *file, unsigned int cmd,
     {
       del = search;
       search = search->next;
-      pci_unmap_single(universeII_dev, del->dcp.dcpp,
-          sizeof(*del), DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+      dma_unmap_single(&universeII_dev->dev, del->dcp.dcpp, sizeof(*del), DMA_BIDIRECTIONAL);
+#else
+      pci_unmap_single(universeII_dev, del->dcp.dcpp, sizeof(*del), DMA_BIDIRECTIONAL);
+#endif
       kfree(del);
     }
     cpLists[arg].commandPacket = NULL;
@@ -2006,8 +2016,11 @@ static void universeII_remove(struct pci_dev *pdev)
           page < virt_to_page(virtAddr + PCI_BUF_SIZE); ++page)
         ClearPageReserved(page);
 
-      pci_free_consistent(universeII_dev, PCI_BUF_SIZE, virtAddr,
-          image[i].buffer);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+      dma_free_coherent(&universeII_dev->dev, PCI_BUF_SIZE, virtAddr, image[i].buffer);
+#else
+      pci_free_consistent(universeII_dev, PCI_BUF_SIZE, virtAddr, image[i].buffer);
+#endif
     }
   }
 
@@ -2018,7 +2031,11 @@ static void universeII_remove(struct pci_dev *pdev)
         page < virt_to_page(virtAddr + PCI_BUF_SIZE); ++page)
       ClearPageReserved(page);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+    dma_free_coherent(&universeII_dev->dev, PCI_BUF_SIZE, virtAddr, dmaHandle);
+#else
     pci_free_consistent(universeII_dev, PCI_BUF_SIZE, virtAddr, dmaHandle);
+#endif
   }
   // Clean Device Tree
   for (i = 17; i >= 0; i--)
@@ -2308,7 +2325,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
   // Reserve 128kB wide memory area for DMA buffer
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+  virtAddr = dma_alloc_coherent(&universeII_dev->dev, PCI_BUF_SIZE, &dmaHandle, GFP_ATOMIC);
+#else
   virtAddr = pci_alloc_consistent(universeII_dev, PCI_BUF_SIZE, &dmaHandle);
+#endif
   if (virtAddr == NULL)
   {
     printk("%s: Unable to allocate memory for DMA buffer!\n", driver_name);
@@ -2334,8 +2355,11 @@ static int universeII_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
   for (i = 10; i < 18; i++)
   {
-    virtAddr = pci_alloc_consistent(universeII_dev, PCI_BUF_SIZE,
-        &image[i].buffer);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+    virtAddr = dma_alloc_coherent(&universeII_dev->dev, PCI_BUF_SIZE, &image[i].buffer, GFP_ATOMIC);
+#else
+    virtAddr = pci_alloc_consistent(universeII_dev, PCI_BUF_SIZE, &image[i].buffer);
+#endif
 
     if (virtAddr == NULL)
     {

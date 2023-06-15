@@ -4,6 +4,6 @@ systems via the Tundra UniverseII chip.
 The whole set of files is brought to you under the terms of the
 GNU General Public license.  A copy is with these files as GPL.
 
-This driver version works with linux kernels 2.6.x, 3.x, 4.x.
+This driver version works with linux kernels 2.6.x, 3.x, 4.x., 5.x, 6.x
 
 For more informations have a look at the pdf manual in directory "doc".
