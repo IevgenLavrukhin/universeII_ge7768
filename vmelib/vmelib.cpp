@@ -39,7 +39,7 @@ using namespace std;
 //----------------------------------------------------------------------------
 void VMEBridge::vmeSysReset()
 {
-  ioctl(uni_handle, IOCTL_VMESYSRST, 0);
+  ioctl(uni_handle, IOCTL_VMESYSRST, 0ul);
 }
 
 //----------------------------------------------------------------------------
@@ -47,7 +47,7 @@ void VMEBridge::vmeSysReset()
 //----------------------------------------------------------------------------
 int VMEBridge::resetDriver()
 {
-  if (ioctl(uni_handle, IOCTL_RESET_ALL, 0) != 0)
+  if (ioctl(uni_handle, IOCTL_RESET_ALL, 0ul) != 0)
   {
     *Err << "Error resetting universeII driver!\n";
     return -1;
@@ -247,7 +247,7 @@ int VMEBridge::wb(int image, unsigned int addr, unsigned char *data)
 //----------------------------------------------------------------------------
 int VMEBridge::testBerr()
 {
-  if (ioctl(uni_handle, IOCTL_TEST_BERR, 0))
+  if (ioctl(uni_handle, IOCTL_TEST_BERR, 0ul))
     return 1;
 
   return 0;
@@ -413,7 +413,7 @@ int VMEBridge::generateVmeIrq(unsigned int irqLevel, unsigned int statusID)
     return -2;
   }
 
-  ioctl(uni_handle, IOCTL_GEN_VME_IRQ, (statusID << 24) | irqLevel);
+  ioctl(uni_handle, IOCTL_GEN_VME_IRQ, (unsigned long)((statusID << 24) | irqLevel));
 
   return 0;
 }
@@ -440,7 +440,7 @@ int VMEBridge::setupMBX(int mailbox)
   if (checkMbxNr(mailbox) != 0)
     return -1;
 
-  if (ioctl(uni_handle, IOCTL_SET_MBX, mailbox) != 0)
+  if (ioctl(uni_handle, IOCTL_SET_MBX, (unsigned long)mailbox) != 0)
   {
     *Err << "Mailbox " << mailbox << " already in use!\n";
     return -2;
@@ -465,7 +465,7 @@ unsigned int VMEBridge::waitMBX(int mailbox, unsigned int timeout)
     return 0xFFFFFFFF;
   }
 
-  mbx = ioctl(uni_handle, IOCTL_WAIT_MBX, (timeout << 16) | mailbox);
+  mbx = ioctl(uni_handle, IOCTL_WAIT_MBX, (unsigned long)((timeout << 16) | mailbox));
 
   if (mbx == 0xFFFFFFFF)
   {
@@ -489,7 +489,7 @@ int VMEBridge::releaseMBX(int mailbox)
   if (checkMbxNr(mailbox) != 0)
     return -1;
 
-  if (ioctl(uni_handle, IOCTL_RELEASE_MBX, mailbox) != 0)
+  if (ioctl(uni_handle, IOCTL_RELEASE_MBX, (unsigned long)mailbox) != 0)
   {
     *Err << "Mailbox " << mailbox << " is not in use!\n";
     return -2;
@@ -523,7 +523,7 @@ uintptr_t VMEBridge::requestDMA(int nrOfBufs)
 
   do
   {
-    result = ioctl(dma_handle, IOCTL_REQUEST_DMA, nrOfBufs);
+    result = ioctl(dma_handle, IOCTL_REQUEST_DMA, (unsigned long)nrOfBufs);
     i++;
   } while ((!result) && (i < 100));
 
@@ -551,7 +551,7 @@ uintptr_t VMEBridge::requestDMA(void)
 //----------------------------------------------------------------------------
 int VMEBridge::enableBltUntilBerr(void)
 {
-  return ioctl(dma_handle, IOCTL_DMA_BLT_BERR, 0);
+  return ioctl(dma_handle, IOCTL_DMA_BLT_BERR, 0ul);
 }
 
 uintptr_t VMEBridge::getDMABase(void)
@@ -564,7 +564,7 @@ uintptr_t VMEBridge::getDMABase(void)
 //----------------------------------------------------------------------------
 void VMEBridge::releaseDMA(void)
 {
-  ioctl(dma_handle, IOCTL_RELEASE_DMA, 0);
+  ioctl(dma_handle, IOCTL_RELEASE_DMA, 0ul);
   if (munmap((char *) dmaImageBase, dmaImageSize))
     *Err << "Can't munmap allocated memory for DMA";
 
@@ -666,7 +666,7 @@ int VMEBridge::newCmdPktList(void)
 {
   int list;
 
-  list = ioctl(uni_handle, IOCTL_NEW_DCP, 0);
+  list = ioctl(uni_handle, IOCTL_NEW_DCP, 0ul);
   if (list < 0)
   {
     *Err << "Can't create new command packet list!\n";
@@ -691,7 +691,7 @@ int VMEBridge::delCmdPktList(int list)
     return -1;
   }
 
-  ioctl(uni_handle, IOCTL_DEL_DCL, list);
+  ioctl(uni_handle, IOCTL_DEL_DCL, (unsigned long)list);
 
   for (it = usedLists.begin(); it != usedLists.end(); it++)
     if (*it == list)
@@ -740,7 +740,13 @@ int VMEBridge::execCmdPktList(int list)
 {
   int ret;
 
-  ret = ioctl(uni_handle, IOCTL_EXEC_DCP, list);
+  if (list < 0)
+  {
+    *Err << "Invalid list number: " << list << "!\n";
+    return -1;
+  }
+
+  ret = ioctl(uni_handle, IOCTL_EXEC_DCP, (unsigned long)list);
 
   if (ret > 0)
   {
@@ -776,7 +782,7 @@ uintptr_t VMEBridge::getPciBaseAddr(int image)
 //----------------------------------------------------------------------------
 void VMEBridge::setOption(int image, unsigned int opt)
 {
-  unsigned int par;
+  unsigned long par;
 
   par = 0;
 
@@ -891,7 +897,7 @@ int VMEBridge::vmemap(int image, unsigned int vme_base, unsigned int size, unsig
   // Disable image and check that device is accessible
 
   ctl &= ~CTL_EN;
-  if (ioctl(vme_handle[image], IOCTL_SET_CTL, ctl))
+  if (ioctl(vme_handle[image], IOCTL_SET_CTL, (unsigned long)ctl))
   {
     *Err << "vmemap: Can't write to image " << image << "!  ";
     bridge_error = -6;
@@ -910,7 +916,7 @@ int VMEBridge::vmemap(int image, unsigned int vme_base, unsigned int size, unsig
   // Enable image
 
   ctl |= CTL_EN;
-  ioctl(vme_handle[image], IOCTL_SET_CTL, ctl);
+  ioctl(vme_handle[image], IOCTL_SET_CTL, (unsigned long)ctl);
 
   return 0;
 }
@@ -926,7 +932,7 @@ int VMEBridge::getImage(unsigned int base, unsigned int size, int vas, int vdw, 
 
   //  Try to allocate a new image;  ms = 0: master image, ms = 1: slave image
 
-  image = ioctl(uni_handle, IOCTL_GET_IMAGE, ms);
+  image = ioctl(uni_handle, IOCTL_GET_IMAGE, (unsigned long)ms);
 
   if (image < 0)
   {
@@ -1060,7 +1066,7 @@ VMEBridge::~VMEBridge(void)
   // remove all existing DMA command packet lists
 
   for (it = usedLists.begin(); it != usedLists.end(); it++)
-    ioctl(uni_handle, IOCTL_DEL_DCL, *it);
+    ioctl(uni_handle, IOCTL_DEL_DCL, (unsigned long)(*it));
 
   // close all opened images and unmap memory
 
