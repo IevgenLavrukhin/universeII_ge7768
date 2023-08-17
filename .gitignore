@@ -1,0 +1,7 @@
+*.o
+*.ko
+driver/.*.cmd
+driver/*.mod
+driver/*.mod.c
+driver/modules.order
+driver/Module.symvers
