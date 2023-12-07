@@ -1,4 +1,22 @@
-- 2008-01-16, Version 0.94 (actual version)
+- 2023-07-18, Version 0.98
+    - changes for linux-6.0 and later
+
+- 2022-06-26, Version 0.97
+    - add ioctl to enable BLT until VME BERR
+
+- 2022-06-13, Version 0.96
+    - Now also works with kernels between 3.10 and 4.17
+    - don't use ioremap_nocache
+    - update proc interface to work with newer kernels
+    - support the new timer interface (linux 4.14 or later)
+    - don't change the PCI BAR values assigned during system boot
+    - request address space for all BARs
+    - release pci resources in case of error during probe
+
+- 2019-09-20, Version 0.95
+    - Changes for 64bit compatibility
+
+- 2008-01-16, Version 0.94
     - waitIrq() can now be called with a timeout parameter.
     - Overlapping of images is now enabled per default.
     - Added a small number of parameter and state checks.

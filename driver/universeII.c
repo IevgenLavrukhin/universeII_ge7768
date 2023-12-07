@@ -40,7 +40,7 @@ MODULE_DESCRIPTION("VME driver for the Tundra Universe II PCI to VME bridge");
 MODULE_AUTHOR("Andreas Ehmanns <universeII@gmx.de>, Jan Hartmann <hartmann@hiskp.uni-bonn.de");
 MODULE_LICENSE("GPL");
 
-static const char Version[] = "0.98 (June 2023)";
+static const char Version[] = "0.98 (July 2023)";
 
 #define VMIC
 #ifdef VMIC
